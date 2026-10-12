@@ -2,7 +2,7 @@
 ### _Probabilistic Reverse-diffusion for Image Synthesis with Multimodal guidance_
 _Research project based on DDPM and CFG papers._
 
-Replication  of **Jonathan Ho, Ajay Jain y Pieter Abbeel, 2020 ·  DDPM**, **Jonathan Ho & Tim Salimans**, 2022 · (CFG)**, sobre **MNIST** and **CIFAR-10**,   
+Replication  of **Jonathan Ho, Ajay Jain y Pieter Abbeel, 2020 ·  DDPM**, **Jonathan Ho & Tim Salimans**, 2022 · (CFG)**, over **MNIST** and **CIFAR-10** datasets,   
 with a web UI for experimental guided generation on top.
 
 - **DDPM Paper:** <https://arxiv.org/pdf/2006.11239>

@@ -25,7 +25,7 @@ from src.utils.seed import fijar_seed          # noqa: E402
 from src.utils.tracking import abrir_run       # noqa: E402
 from src.data.loaders import construir_loaders  # noqa: E402
 from src.models.factory import construir_modelo  # noqa: E402
-from src.training.loop import entrenar_mnist, evaluar_mnist  # noqa: E402
+from src.training.mnist_loop import entrenar_mnist, evaluar_mnist  # noqa: E402
 
 
 def cargar_config(ruta: Path) -> dict:

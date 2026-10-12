@@ -1,4 +1,4 @@
-# CLEAR
+# PRISM
 ### _Probabilistic Reverse-diffusion for Image Synthesis with Multimodal guidance_
 _Research project based on DDPM and CFG papers._
 

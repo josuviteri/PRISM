@@ -32,10 +32,12 @@ entrenamiento:
   max_steps: 10
   optimizador: adam
   grad_clip: 1.0
+  horizontal_flip: true
+  compile: false
   dispositivo: auto
   directorio_checkpoints: checkpoints
 
 wandb:
-  proyecto: tiiac-2026
-  entidad: null
-  modo: disabled
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: offline

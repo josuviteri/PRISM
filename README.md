@@ -55,7 +55,8 @@ python scripts/inference_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.p
 	--output-dir generated --num-samples 64
 
 # Evaluar IS y FID contra el test de CIFAR-10 (usa 10.000 muestras por defecto).
-python scripts/evaluate_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt
+python scripts/evaluate_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt \
+    --batch-size 256 --num-samples 2000
 ```
 
 La evaluacion descarga los pesos de Inception-v3 la primera vez y requiere

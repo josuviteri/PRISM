@@ -42,7 +42,12 @@ class GaussianDiffusion:
         timesteps = torch.randint(0, self.timesteps, (x_start.shape[0],), device=x_start.device)
         noise = torch.randn_like(x_start)
         noisy = self.q_sample(x_start, timesteps, noise)
-        prediction = denoiser(noisy, timesteps)
+        with torch.autocast(
+            "cuda",
+            dtype=torch.bfloat16,
+            enabled=x_start.device.type == "cuda",
+        ):
+            prediction = denoiser(noisy, timesteps)
         return torch.nn.functional.mse_loss(prediction, noise)
 
     @torch.no_grad()
@@ -117,6 +122,14 @@ def _gradient_norm(model: nn.Module) -> Tensor:
     return torch.sqrt(torch.stack([gradient.float().pow(2).sum() for gradient in gradients]).sum())
 
 
+def _apply_horizontal_flip(images: Tensor) -> Tensor:
+    """Randomly flips half of a batch of image tensors left-to-right."""
+    if images.ndim != 4:
+        return images
+    mask = torch.rand(images.shape[0], device=images.device) < 0.5
+    return torch.where(mask[:, None, None, None], images.flip(dims=(-1,)), images)
+
+
 def _save_checkpoint(
     model: nn.Module,
     ema: ExponentialMovingAverage,
@@ -148,6 +161,8 @@ def _epoch(
     grad_clip: float | None,
     ema: ExponentialMovingAverage | None,
     max_batches: int | None = None,
+    horizontal_flip: bool = False,
+    ema_model: nn.Module | None = None,
 ) -> tuple[float, int, float]:
     model.train()
     total_loss = 0.0
@@ -156,6 +171,8 @@ def _epoch(
     maximum_gradient_norm = 0.0
     for images, _ in loader:
         images = images.to(device, non_blocking=True)
+        if horizontal_flip:
+            images = _apply_horizontal_flip(images)
         optimizer.zero_grad(set_to_none=True)
         loss = diffusion.loss(model, images)
         if not torch.isfinite(loss):
@@ -172,7 +189,7 @@ def _epoch(
         if not all(torch.isfinite(parameter).all() for parameter in model.parameters()):
             raise FloatingPointError(f"non-finite model parameters at batch {batches + 1}")
         if ema is not None:
-            ema.update(model)
+            ema.update(model if ema_model is None else ema_model)
         total_loss += loss.item() * images.shape[0]
         total_items += images.shape[0]
         batches += 1
@@ -205,11 +222,14 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
     model.to(device)
     model_cfg = cfg["modelo"]
     train_cfg = cfg["entrenamiento"]
+    train_model = model
+    if train_cfg.get("compile", False) and device.type == "cuda":
+        train_model = torch.compile(model)
     diffusion = GaussianDiffusion(
         model_cfg["diffusion_steps"], model_cfg["beta_start"], model_cfg["beta_end"], device)
     optimizer_name = train_cfg["optimizador"].lower()
     optimizer_cls = {"adam": torch.optim.Adam, "adamw": torch.optim.AdamW}[optimizer_name]
-    optimizer = optimizer_cls(model.parameters(), lr=train_cfg["learning_rate"])
+    optimizer = optimizer_cls(train_model.parameters(), lr=train_cfg["learning_rate"])
     ema = ExponentialMovingAverage(model, model_cfg["ema_decay"])
     max_steps = train_cfg.get("max_steps")
     global_step = 0
@@ -221,7 +241,17 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
         if remaining_steps is not None and remaining_steps <= 0:
             break
         train_loss, batches, gradient_norm = _epoch(
-            model, diffusion, train_loader, optimizer, device, train_cfg.get("grad_clip"), ema, remaining_steps)
+            train_model,
+            diffusion,
+            train_loader,
+            optimizer,
+            device,
+            train_cfg.get("grad_clip"),
+            ema,
+            remaining_steps,
+            train_cfg.get("horizontal_flip", False),
+            model,
+        )
         global_step += batches
         metrics = evaluar(model, val_loader, cfg, device)
         metrics["train/loss"] = train_loss
@@ -238,8 +268,8 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             raise FloatingPointError(f"non-finite validation loss at epoch {epoch + 1}")
         if metrics["val/loss"] < best_val_loss:
             best_val_loss = metrics["val/loss"]
-            checkpoint = _save_checkpoint(model, ema, cfg, epoch + 1, best_val_loss)
-            registrar_checkpoint(run, checkpoint, cfg["experimento"]["nombre"])
+        checkpoint = _save_checkpoint(model, ema, cfg, epoch + 1, best_val_loss)
+        registrar_checkpoint(run, checkpoint, cfg["experimento"]["nombre"])
         if max_steps is not None and global_step >= max_steps:
             break
 

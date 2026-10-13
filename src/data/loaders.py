@@ -2,8 +2,8 @@
 
 REGLAS QUE NO SE ROMPEN (y que el revisor del PR comprueba):
   1. El split se hace ANTES de cualquier transformacion ajustada a los datos.
-  2. La normalizacion usa estadisticas de ENTRENAMIENTO, nunca del conjunto
-     completo. Lo contrario es una fuga: no da error e infla tu metrica.
+  2. CIFAR-10 se normaliza con media y desviacion (0.5, 0.5, 0.5),
+      dejando los tensores en el rango esperado por DDPM: [-1, 1].
   3. El data augmentation se aplica a train, jamas a validacion ni a test.
 
 Configuracion esperada (cfg["datos"]):
@@ -143,10 +143,10 @@ def _estadisticas(ds_crudo: Dataset, indices, batch_size: int = 1000):
     return media.tolist(), std.tolist()
 
 
-def _transforms(nombre: str, media, std, augment: bool):
+def _transforms(nombre: str, augment: bool):
     """Devuelve (transform_train, transform_eval). El augmentation solo va en train."""
     _, size, _ = _DATASETS[nombre]
-    base = [_ToTensor(), _Normalize(media, std)]
+    base = [_ToTensor(), _Normalize((0.5,) * 3, (0.5,) * 3)]
 
     aug = []
     if augment:
@@ -188,9 +188,7 @@ def construir_datasets(cfg: dict):
         crudo = cls(ruta, train=True, transform=_ToTensor())
         train_idx, val_idx = _split_indices(len(crudo), dcfg.get("val_frac", 0.1), seed)
 
-        # Regla 2: estadisticas SOLO con los indices de train.
-        media, std = _estadisticas(crudo, train_idx)
-        tf_train, tf_eval = _transforms(nombre, media, std, dcfg.get("augment", False))
+        tf_train, tf_eval = _transforms(nombre, dcfg.get("augment", False))
 
         # Regla 3: dos vistas del mismo set, cada una con su transform.
         # Train lleva augmentation; val y test, no.

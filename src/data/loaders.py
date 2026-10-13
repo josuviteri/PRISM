@@ -19,15 +19,87 @@ Configuracion esperada (cfg["datos"]):
 
 from __future__ import annotations
 
-import torch
-from torch.utils.data import DataLoader, Dataset, Subset
-from torchvision import datasets, transforms
+import csv
+import random
+from pathlib import Path
 
-# Dataset -> (clase torchvision, tamano de imagen, canales)
-_DATASETS = {
-    "mnist": (datasets.MNIST, 28, 1),
-    "cifar10": (datasets.CIFAR10, 32, 3),
-}
+import torch
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset, Subset
+
+
+class _Compose:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, value):
+        for transform in self.transforms:
+            value = transform(value)
+        return value
+
+
+class _ToTensor:
+    def __call__(self, image: Image.Image) -> torch.Tensor:
+        values = torch.tensor(list(image.getdata()), dtype=torch.float32)
+        return values.reshape(image.height, image.width, 3).permute(2, 0, 1) / 255.0
+
+
+class _Normalize:
+    def __init__(self, mean, std):
+        self.mean = torch.tensor(mean, dtype=torch.float32)[:, None, None]
+        self.std = torch.tensor(std, dtype=torch.float32)[:, None, None]
+
+    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+        return (image - self.mean) / self.std
+
+
+class _RandomHorizontalFlip:
+    def __call__(self, image: Image.Image) -> Image.Image:
+        if random.random() < 0.5:
+            return image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        return image
+
+
+class _RandomCrop:
+    def __init__(self, size: int, padding: int):
+        self.size = size
+        self.padding = padding
+
+    def __call__(self, image: Image.Image) -> Image.Image:
+        padded = Image.new("RGB", (image.width + 2 * self.padding, image.height + 2 * self.padding))
+        padded.paste(image, (self.padding, self.padding))
+        left = random.randint(0, padded.width - self.size)
+        top = random.randint(0, padded.height - self.size)
+        return padded.crop((left, top, left + self.size, top + self.size))
+
+class LocalCIFAR10(Dataset):
+    """CIFAR-10 PNG export used by this project, with labels from CSV."""
+
+    def __init__(self, root: str | Path, train: bool, transform=None):
+        self.root = Path(root)
+        self.transform = transform
+        self.image_dir = self.root / ("train" if train else "test")
+        self.files = sorted(self.image_dir.glob("*.png"), key=lambda path: int(path.stem))
+        self.labels = {}
+        if train:
+            with (self.root / "trainLabels.csv").open(newline="", encoding="utf-8") as file:
+                self.labels = {int(row["id"]): row["label"] for row in csv.DictReader(file)}
+            classes = sorted(set(self.labels.values()))
+            self.class_to_idx = {name: index for index, name in enumerate(classes)}
+
+    def __len__(self) -> int:
+        return len(self.files)
+
+    def __getitem__(self, index: int):
+        path = self.files[index]
+        image = Image.open(path).convert("RGB")
+        if self.transform is not None:
+            image = self.transform(image)
+        label = self.class_to_idx[self.labels[int(path.stem)]] if self.labels else -1
+        return image, label
+
+
+_DATASETS = {"mnist": (None, 28, 1), "cifar10": (LocalCIFAR10, 32, 3)}
 
 
 class DatasetPlaceholder(Dataset):
@@ -74,15 +146,15 @@ def _estadisticas(ds_crudo: Dataset, indices, batch_size: int = 1000):
 def _transforms(nombre: str, media, std, augment: bool):
     """Devuelve (transform_train, transform_eval). El augmentation solo va en train."""
     _, size, _ = _DATASETS[nombre]
-    base = [transforms.ToTensor(), transforms.Normalize(media, std)]
+    base = [_ToTensor(), _Normalize(media, std)]
 
     aug = []
     if augment:
-        aug.append(transforms.RandomCrop(size, padding=size // 8))
+        aug.append(_RandomCrop(size, padding=size // 8))
         if nombre == "cifar10":          # un volteo cambiaria el significado de un digito
-            aug.append(transforms.RandomHorizontalFlip())
+            aug.append(_RandomHorizontalFlip())
 
-    return transforms.Compose(aug + base), transforms.Compose(base)
+    return _Compose(aug + base), _Compose(base)
 
 
 def _split_indices(n: int, val_frac: float, seed: int):
@@ -107,11 +179,13 @@ def construir_datasets(cfg: dict):
         test_ds = None
     elif nombre in _DATASETS:
         cls, _, _ = _DATASETS[nombre]
-        ruta = dcfg.get("ruta", "./data")
+        ruta = dcfg.get("ruta", dcfg.get("raiz", "./data"))
         seed = dcfg.get("seed", 0)
 
         # Regla 1: primero el split (solo indices, no se ajusta nada todavia).
-        crudo = cls(ruta, train=True, download=True, transform=transforms.ToTensor())
+        if nombre == "mnist":
+            raise NotImplementedError("The local pipeline currently supports CIFAR-10 only")
+        crudo = cls(ruta, train=True, transform=_ToTensor())
         train_idx, val_idx = _split_indices(len(crudo), dcfg.get("val_frac", 0.1), seed)
 
         # Regla 2: estadisticas SOLO con los indices de train.
@@ -122,7 +196,7 @@ def construir_datasets(cfg: dict):
         # Train lleva augmentation; val y test, no.
         train_ds = Subset(cls(ruta, train=True, transform=tf_train), train_idx)
         val_ds = Subset(cls(ruta, train=True, transform=tf_eval), val_idx)
-        test_ds = cls(ruta, train=False, download=True, transform=tf_eval)
+        test_ds = cls(ruta, train=False, transform=tf_eval)
     else:
         raise ValueError(
             f"Dataset '{nombre}' no disponible. Opciones: placeholder, {', '.join(_DATASETS)}"

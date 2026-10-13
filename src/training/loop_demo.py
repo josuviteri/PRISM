@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from src.utils.tracking_demo import registrar
+from src.utils.tracking import registrar
 
 OPTIMIZADORES = {
     "adam": torch.optim.Adam,

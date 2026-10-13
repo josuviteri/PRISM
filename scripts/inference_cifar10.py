@@ -35,7 +35,7 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("generated"))
     parser.add_argument("--num-samples", type=int, default=64)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()

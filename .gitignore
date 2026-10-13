@@ -36,3 +36,4 @@ secrets.*
 # ---- sistema ----
 .DS_Store
 Thumbs.db
+generated

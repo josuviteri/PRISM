@@ -2,7 +2,7 @@
 # es lo que permite reproducir un experimento sabiendo solo que config se uso.
 
 experimento:
-  nombre: baseline
+  nombre: cifar10_ddpm_v0.1
   seed: 42
 
 datos:
@@ -25,7 +25,7 @@ modelo:
   ema_decay: 0.9999
 
 entrenamiento:
-  learning_rate: 0.001
+  learning_rate: 0.0002
   epochs: 20
   optimizador: adam
   grad_clip: 1.0

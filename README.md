@@ -49,7 +49,18 @@ python run.py --config configs/default.yaml
 
 # El aplicativo, sobre el checkpoint entrenado.
 python -m src.app.serve --checkpoint checkpoints/mejor.pt
+
+# Generar imagenes desde ruido gaussiano usando los pesos EMA.
+python scripts/inference_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt \
+	--output-dir generated --num-samples 64
+
+# Evaluar IS y FID contra el test de CIFAR-10 (usa 10.000 muestras por defecto).
+python scripts/evaluate_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt
 ```
+
+La evaluacion descarga los pesos de Inception-v3 la primera vez y requiere
+`torchvision`, incluido en `requirements.txt`. Para una comprobacion rapida se
+puede reducir el coste con `--num-samples 100`.
 
 ## Estructura
 

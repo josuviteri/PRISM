@@ -215,7 +215,8 @@ def construir_loaders(cfg: dict) -> tuple[DataLoader, DataLoader]:
     train_ds, val_ds, _ = construir_datasets(cfg)
 
     comun = dict(batch_size=dcfg["batch_size"],
-                 num_workers=dcfg.get("num_workers", 0))
+                 num_workers=dcfg.get("num_workers", 0),
+                 pin_memory=dcfg.get("pin_memory", False))
     return (DataLoader(train_ds, shuffle=True, **comun),
             DataLoader(val_ds, shuffle=False, **comun))
 
@@ -227,4 +228,5 @@ def construir_test_loader(cfg: dict) -> DataLoader:
     if test_ds is None:
         raise ValueError("El dataset 'placeholder' no tiene conjunto de test.")
     return DataLoader(test_ds, shuffle=False, batch_size=dcfg["batch_size"],
-                      num_workers=dcfg.get("num_workers", 0))
+                      num_workers=dcfg.get("num_workers", 0),
+                      pin_memory=dcfg.get("pin_memory", False))

@@ -2,7 +2,7 @@
 # es lo que permite reproducir un experimento sabiendo solo que config se uso.
 
 experimento:
-  nombre: cifar10_ddpm_v0.1
+  nombre: cifar10_ddpm_v0.2
   seed: 42
 
 datos:
@@ -10,7 +10,8 @@ datos:
   ruta: data/data/cifar-10
   subset: null          # null = dataset completo; un entero = N muestras (regla 5/20)
   batch_size: 128
-  num_workers: 2
+  num_workers: 4
+  pin_memory: true
 
 modelo:
   nombre: ddpm_cifar
@@ -26,7 +27,7 @@ modelo:
 
 entrenamiento:
   learning_rate: 0.0002
-  epochs: 20 # ampliar a ~65 epochs para entrenamientos más serios 
+  epochs: 20 # ampliar a ~65 (50k steps) o más epochs para entrenamientos más serios
   optimizador: adam
   grad_clip: 1.0
   horizontal_flip: true # es util con cifar10, pero desactivar con MNIST
@@ -36,5 +37,5 @@ entrenamiento:
 
 wandb:
   proyecto: PRISM
-  entidad: Viteritarrak        
+  entidad: Viteritarrak
   modo: online 

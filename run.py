@@ -17,15 +17,15 @@ import argparse
 import sys
 from pathlib import Path
 
+import torch
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.utils.seed import fijar_seed          # noqa: E402
-from src.utils.tracking import abrir_run       # noqa: E402
+from src.utils.seed_demo import fijar_seed     # noqa: E402
+from src.utils.tracking import abrir_run  # noqa: E402
 from src.data.loaders import construir_loaders  # noqa: E402
-from src.models.factory import construir_modelo  # noqa: E402
-from src.training.mnist_loop import entrenar_mnist, evaluar_mnist  # noqa: E402
+from src.training.cifar_loop import construir_modelo, entrenar, evaluar, _device  # noqa: E402
 
 
 def cargar_config(ruta: Path) -> dict:
@@ -63,7 +63,15 @@ def main() -> int:
     modelo = construir_modelo(cfg)
 
     # 5 · entrenar y evaluar
-    if not args.solo_evaluar:
+    checkpoint = Path(cfg["entrenamiento"].get("directorio_checkpoints", "checkpoints")) / f'{cfg["experimento"]["nombre"]}.pt'
+    if args.solo_evaluar:
+        if not checkpoint.is_file():
+            print(f"error: no existe el checkpoint {checkpoint}", file=sys.stderr)
+            return 2
+        estado = torch.load(checkpoint, map_location="cpu", weights_only=True)
+        modelo.load_state_dict(estado["ema"])
+        modelo.to(_device(cfg))
+    else:
         entrenar(modelo, train_loader, val_loader, cfg, run)
     metricas = evaluar(modelo, val_loader, cfg)
 

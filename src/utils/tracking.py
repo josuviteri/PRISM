@@ -6,6 +6,7 @@ que los tests puedan correr con modo='disabled'.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 
@@ -33,3 +34,14 @@ def registrar(run: Any | None, metricas: dict, paso: int | None = None) -> None:
     """Registra metricas si hay run abierto. Silencioso si no."""
     if run is not None:
         run.log(metricas, step=paso)
+
+
+def registrar_checkpoint(run: Any | None, checkpoint: Path, nombre: str) -> None:
+    """Sube un checkpoint terminado a W&B como Artifact."""
+    if run is None:
+        return
+    import wandb
+
+    artifact = wandb.Artifact(nombre, type="model")
+    artifact.add_file(str(checkpoint))
+    run.log_artifact(artifact)

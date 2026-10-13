@@ -6,19 +6,31 @@ experimento:
   seed: 42
 
 datos:
-  raiz: data/
+  nombre: cifar10
+  ruta: data/data/cifar-10
   subset: null          # null = dataset completo; un entero = N muestras (regla 5/20)
   batch_size: 64
   num_workers: 2
 
 modelo:
-  nombre: mi_modelo
-  # ... los del paper. Cada valor deberia poder senyalarse en la ficha de replicacion.
+  nombre: ddpm_cifar
+  base_channels: 128
+  channel_multipliers: [1, 2, 2, 2]
+  residual_blocks: 2
+  attention_resolutions: [16]
+  dropout: 0.1
+  diffusion_steps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  ema_decay: 0.9999
 
 entrenamiento:
   learning_rate: 0.001
   epochs: 20
   optimizador: adam
+  grad_clip: 1.0
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
 
 wandb:
   proyecto: tiiac-2026

@@ -47,6 +47,9 @@ python run.py --smoke
 # Entrenamiento completo. Menos de 20 minutos en una T4 de Colab gratuito.
 python run.py --config configs/default.yaml
 
+# Entrenamiento DDPM incondicional sobre CIFAR10.
+python run.py --config configs/cifar10.yaml
+
 # Entrenamiento DDPM incondicional sobre el MNIST IDX local.
 python run.py --config configs/mnist.yaml
 

@@ -47,6 +47,9 @@ python run.py --smoke
 # Entrenamiento completo. Menos de 20 minutos en una T4 de Colab gratuito.
 python run.py --config configs/default.yaml
 
+# Entrenamiento DDPM incondicional sobre el MNIST IDX local.
+python run.py --config configs/mnist.yaml
+
 # El aplicativo, sobre el checkpoint entrenado.
 python -m src.app.serve --checkpoint checkpoints/mejor.pt
 
@@ -58,6 +61,11 @@ python scripts/inference_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.p
 python scripts/evaluate_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt \
     --batch-size 256 --num-samples 2000
 ```
+
+El entrenamiento MNIST espera los cuatro ficheros IDX sin comprimir en
+`data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`,
+`t10k-images.idx3-ubyte` y `t10k-labels.idx1-ubyte`. Las imágenes se mantienen
+en `28x28` con un canal; la normalización se calcula solo con el split de train.
 
 La evaluacion descarga los pesos de Inception-v3 la primera vez y requiere
 `torchvision`, incluido en `requirements.txt`. Para una comprobacion rapida se

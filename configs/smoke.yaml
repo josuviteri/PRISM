@@ -29,6 +29,7 @@ modelo:
 
 entrenamiento:
   learning_rate: 0.0002
+  warmup_steps: 0
   epochs: 1
   max_steps: 10
   optimizador: adam

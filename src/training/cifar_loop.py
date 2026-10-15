@@ -130,6 +130,19 @@ def _apply_horizontal_flip(images: Tensor) -> Tensor:
     return torch.where(mask[:, None, None, None], images.flip(dims=(-1,)), images)
 
 
+def _warmup_scheduler(optimizer: torch.optim.Optimizer, warmup_steps: int):
+    """Creates a per-update linear warmup scheduler."""
+    if warmup_steps < 0:
+        raise ValueError("warmup_steps must be non-negative")
+
+    def warmup_factor(step: int) -> float:
+        if warmup_steps == 0:
+            return 1.0
+        return min(1.0, (step + 1) / warmup_steps)
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_factor)
+
+
 def _save_checkpoint(
     model: nn.Module,
     ema: ExponentialMovingAverage,
@@ -157,6 +170,7 @@ def _epoch(
     diffusion: GaussianDiffusion,
     loader,
     optimizer,
+    scheduler,
     device: torch.device,
     grad_clip: float | None,
     ema: ExponentialMovingAverage | None,
@@ -186,6 +200,7 @@ def _epoch(
         if grad_clip is not None:
             nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
+        scheduler.step()
         if not all(torch.isfinite(parameter).all() for parameter in model.parameters()):
             raise FloatingPointError(f"non-finite model parameters at batch {batches + 1}")
         if ema is not None:
@@ -230,6 +245,7 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
     optimizer_name = train_cfg["optimizador"].lower()
     optimizer_cls = {"adam": torch.optim.Adam, "adamw": torch.optim.AdamW}[optimizer_name]
     optimizer = optimizer_cls(train_model.parameters(), lr=train_cfg["learning_rate"])
+    scheduler = _warmup_scheduler(optimizer, train_cfg.get("warmup_steps", 0))
     ema = ExponentialMovingAverage(model, model_cfg["ema_decay"])
     max_steps = train_cfg.get("max_steps")
     global_step = 0
@@ -245,6 +261,7 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             diffusion,
             train_loader,
             optimizer,
+            scheduler,
             device,
             train_cfg.get("grad_clip"),
             ema,

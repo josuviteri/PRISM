@@ -29,7 +29,8 @@ modelo:
 
 entrenamiento:
   learning_rate: 0.0002
-  epochs: 20
+  warmup_steps: 1000
+  epochs: 110 # steps = trainval size / batch size * epochs | mnist 110 epochs on 128 batch = ~51k steps
   optimizador: adam
   grad_clip: 1.0
   horizontal_flip: false

@@ -27,7 +27,8 @@ modelo:
 
 entrenamiento:
   learning_rate: 0.0002
-  epochs: 20 # ampliar a ~65 (50k steps) o más epochs para entrenamientos más serios
+  warmup_steps: 1000
+  epochs: 130 # steps = trainval size / batch size * epochs | cifar10 130 epochs on 128 batch = ~51k steps
   optimizador: adam
   grad_clip: 1.0
   horizontal_flip: true # es util con cifar10, pero desactivar con MNIST

@@ -27,6 +27,7 @@ modelo:
 
 entrenamiento:
   learning_rate: 0.0002
+  warmup_steps: 0
   epochs: 20
   optimizador: adam
   grad_clip: 1.0

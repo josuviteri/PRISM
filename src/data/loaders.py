@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import random
+import struct
 from pathlib import Path
 
 import torch
@@ -41,7 +42,8 @@ class _Compose:
 class _ToTensor:
     def __call__(self, image: Image.Image) -> torch.Tensor:
         values = torch.tensor(list(image.getdata()), dtype=torch.float32)
-        return values.reshape(image.height, image.width, 3).permute(2, 0, 1) / 255.0
+        channels = len(image.getbands())
+        return values.reshape(image.height, image.width, channels).permute(2, 0, 1) / 255.0
 
 
 class _Normalize:
@@ -66,11 +68,15 @@ class _RandomCrop:
         self.padding = padding
 
     def __call__(self, image: Image.Image) -> Image.Image:
-        padded = Image.new("RGB", (image.width + 2 * self.padding, image.height + 2 * self.padding))
+        padded = Image.new(
+            image.mode,
+            (image.width + 2 * self.padding, image.height + 2 * self.padding),
+        )
         padded.paste(image, (self.padding, self.padding))
         left = random.randint(0, padded.width - self.size)
         top = random.randint(0, padded.height - self.size)
         return padded.crop((left, top, left + self.size, top + self.size))
+
 
 class LocalCIFAR10(Dataset):
     """CIFAR-10 PNG export used by this project, with labels from CSV."""
@@ -98,8 +104,60 @@ class LocalCIFAR10(Dataset):
         label = self.class_to_idx[self.labels[int(path.stem)]] if self.labels else -1
         return image, label
 
+class LocalMNIST(Dataset):
+    """Local MNIST dataset backed by the standard uncompressed IDX files."""
 
-_DATASETS = {"mnist": (None, 28, 1), "cifar10": (LocalCIFAR10, 32, 3)}
+    _FILES = {
+        True: ("train-images.idx3-ubyte", "train-labels.idx1-ubyte"),
+        False: ("t10k-images.idx3-ubyte", "t10k-labels.idx1-ubyte"),
+    }
+
+    def __init__(self, root: str | Path, train: bool, transform=None):
+        self.root = Path(root)
+        self.transform = transform
+        image_name, label_name = self._FILES[train]
+        self.images = self._read_images(self.root / image_name)
+        self.labels = self._read_labels(self.root / label_name, len(self.images))
+
+    @staticmethod
+    def _read_images(path: Path) -> torch.Tensor:
+        data = path.read_bytes()
+        if len(data) < 16:
+            raise ValueError(f"MNIST image file is too short: {path}")
+        magic, count, rows, columns = struct.unpack(">IIII", data[:16])
+        if magic != 2051 or rows != 28 or columns != 28:
+            raise ValueError(f"invalid MNIST image header in {path}")
+        expected = 16 + count * rows * columns
+        if len(data) != expected:
+            raise ValueError(f"MNIST image count does not match file size: {path}")
+        return torch.frombuffer(bytearray(data), dtype=torch.uint8, offset=16).clone().reshape(
+            count, rows, columns
+        )
+
+    @staticmethod
+    def _read_labels(path: Path, expected_count: int) -> torch.Tensor:
+        data = path.read_bytes()
+        if len(data) < 8:
+            raise ValueError(f"MNIST label file is too short: {path}")
+        magic, count = struct.unpack(">II", data[:8])
+        if magic != 2049 or count != expected_count or len(data) != 8 + count:
+            raise ValueError(f"invalid MNIST label file: {path}")
+        labels = torch.frombuffer(bytearray(data), dtype=torch.uint8, offset=8).clone()
+        if torch.any(labels > 9):
+            raise ValueError(f"MNIST labels must be in [0, 9]: {path}")
+        return labels.to(torch.long)
+
+    def __len__(self) -> int:
+        return self.images.shape[0]
+
+    def __getitem__(self, index: int):
+        image = Image.fromarray(self.images[index].numpy(), mode="L")
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, self.labels[index].item()
+
+
+_DATASETS = {"mnist": (LocalMNIST, 28, 1), "cifar10": (LocalCIFAR10, 32, 3)}
 
 
 class DatasetPlaceholder(Dataset):
@@ -143,10 +201,12 @@ def _estadisticas(ds_crudo: Dataset, indices, batch_size: int = 1000):
     return media.tolist(), std.tolist()
 
 
-def _transforms(nombre: str, augment: bool):
+def _transforms(nombre: str, augment: bool, mean=None, std=None):
     """Devuelve (transform_train, transform_eval). El augmentation solo va en train."""
-    _, size, _ = _DATASETS[nombre]
-    base = [_ToTensor(), _Normalize((0.5,) * 3, (0.5,) * 3)]
+    _, size, channels = _DATASETS[nombre]
+    mean = (0.5,) * channels if mean is None else mean
+    std = (0.5,) * channels if std is None else std
+    base = [_ToTensor(), _Normalize(mean, std)]
 
     aug = []
     if augment:
@@ -183,12 +243,14 @@ def construir_datasets(cfg: dict):
         seed = dcfg.get("seed", 0)
 
         # Regla 1: primero el split (solo indices, no se ajusta nada todavia).
-        if nombre == "mnist":
-            raise NotImplementedError("The local pipeline currently supports CIFAR-10 only")
         crudo = cls(ruta, train=True, transform=_ToTensor())
         train_idx, val_idx = _split_indices(len(crudo), dcfg.get("val_frac", 0.1), seed)
 
-        tf_train, tf_eval = _transforms(nombre, dcfg.get("augment", False))
+        if nombre == "mnist":
+            mean, std = _estadisticas(crudo, train_idx)
+        else:
+            mean, std = None, None
+        tf_train, tf_eval = _transforms(nombre, dcfg.get("augment", False), mean, std)
 
         # Regla 3: dos vistas del mismo set, cada una con su transform.
         # Train lleva augmentation; val y test, no.

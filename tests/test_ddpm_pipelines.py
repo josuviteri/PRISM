@@ -4,8 +4,8 @@ import torch
 import yaml
 from torch.utils.data import DataLoader, Subset
 
-from run import _pipeline
 from src.data.loaders import construir_datasets
+from src.training import diffusion_loop
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,13 +83,12 @@ def test_mnist_loader_returns_grayscale_and_split():
 
 def test_mnist_pipeline_trains_and_writes_checkpoint(tmp_path):
     cfg = _config(tmp_path)
-    pipeline = _pipeline(cfg)
     train, val, _ = construir_datasets(cfg)
     train_loader = DataLoader(Subset(train, range(2)), batch_size=2, shuffle=False)
     val_loader = DataLoader(Subset(val, range(2)), batch_size=2, shuffle=False)
-    model = pipeline.construir_modelo(cfg)
+    model = diffusion_loop.construir_modelo(cfg)
 
-    metrics = pipeline.entrenar(model, train_loader, val_loader, cfg)
+    metrics = diffusion_loop.entrenar(model, train_loader, val_loader, cfg)
     checkpoint = tmp_path / f"{cfg['experimento']['nombre']}.pt"
     state = torch.load(checkpoint, map_location="cpu", weights_only=True)
 
@@ -126,13 +125,12 @@ def test_cifar10_loader_returns_rgb_and_split():
 
 def test_cifar10_pipeline_trains_and_writes_checkpoint(tmp_path):
     cfg = _cifar10_config(tmp_path)
-    pipeline = _pipeline(cfg)
     train, val, _ = construir_datasets(cfg)
     train_loader = DataLoader(Subset(train, range(2)), batch_size=2, shuffle=False)
     val_loader = DataLoader(Subset(val, range(2)), batch_size=2, shuffle=False)
-    model = pipeline.construir_modelo(cfg)
+    model = diffusion_loop.construir_modelo(cfg)
 
-    metrics = pipeline.entrenar(model, train_loader, val_loader, cfg)
+    metrics = diffusion_loop.entrenar(model, train_loader, val_loader, cfg)
     checkpoint = tmp_path / f"{cfg['experimento']['nombre']}.pt"
     state = torch.load(checkpoint, map_location="cpu", weights_only=True)
 

@@ -25,20 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.utils.seed_demo import fijar_seed     # noqa: E402
 from src.utils.tracking import abrir_run  # noqa: E402
 from src.data.loaders import construir_loaders  # noqa: E402
-
-
-def _pipeline(cfg: dict):
-    """Returns the training module selected by the dataset configuration."""
-    nombre = cfg.get("datos", {}).get("nombre", "placeholder")
-    if nombre == "mnist":
-        from src.training import mnist_loop
-
-        return mnist_loop
-    if nombre in {"cifar10", "placeholder"}:
-        from src.training import cifar_loop
-
-        return cifar_loop
-    raise ValueError(f"Dataset '{nombre}' has no training pipeline")
+from src.training import diffusion_loop # noqa: E402
 
 
 def cargar_config(ruta: Path) -> dict:
@@ -62,7 +49,6 @@ def main() -> int:
         print(f"error: no existe {ruta}", file=sys.stderr)
         return 2
     cfg = cargar_config(ruta)
-    pipeline = _pipeline(cfg)
 
     # 1 · reproducibilidad, antes que nada
     fijar_seed(cfg["experimento"]["seed"])
@@ -74,7 +60,7 @@ def main() -> int:
     train_loader, val_loader = construir_loaders(cfg)
 
     # 4 · modelo
-    modelo = pipeline.construir_modelo(cfg)
+    modelo = diffusion_loop.construir_modelo(cfg)
 
     # 5 · entrenar y evaluar
     checkpoint = Path(cfg["entrenamiento"].get("directorio_checkpoints", "checkpoints")) / f'{cfg["experimento"]["nombre"]}.pt'
@@ -84,10 +70,10 @@ def main() -> int:
             return 2
         estado = torch.load(checkpoint, map_location="cpu", weights_only=True)
         modelo.load_state_dict(estado["ema"])
-        modelo.to(pipeline._device(cfg))
+        modelo.to(diffusion_loop._device(cfg))
     else:
-        pipeline.entrenar(modelo, train_loader, val_loader, cfg, run)
-    metricas = pipeline.evaluar(modelo, val_loader, cfg)
+        diffusion_loop.entrenar(modelo, train_loader, val_loader, cfg, run)
+    metricas = diffusion_loop.evaluar(modelo, val_loader, cfg)
 
     # 6 · el smoke test TIENE que imprimir una metrica: es la prueba de que el
     #     pipeline llega hasta el final. El checker lo comprueba.

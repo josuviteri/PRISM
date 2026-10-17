@@ -37,3 +37,4 @@ secrets.*
 .DS_Store
 Thumbs.db
 generated
+samples/

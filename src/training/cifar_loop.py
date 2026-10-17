@@ -133,7 +133,8 @@ class GaussianDiffusion:
                 self.sqrt_recip_alpha_bars[step] * sample
                 - self.sqrt_recipm1_alpha_bars[step] * predicted_noise
             ).clamp(-1.0, 1.0)
-            alpha_bar_prev = self.alpha_bars[step - 1] if step > 0 else torch.ones((), device=device)
+            prev_step = schedule[position - 1] if position > 0 else -1
+            alpha_bar_prev = self.alpha_bars[prev_step] if prev_step > 0 else torch.ones((), device=device)
             sample = (
                 alpha_bar_prev.sqrt() * x0
                 + (1.0 - alpha_bar_prev).sqrt() * predicted_noise

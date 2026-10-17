@@ -19,8 +19,9 @@ from src.data.loaders import construir_test_loader  # noqa: E402
 from src.training.cifar_loop import (  # noqa: E402
     GaussianDiffusion,
     _save_image_grid,
-    construir_modelo,
+    construir_modelo as construir_modelo_cifar,
 )
+from src.training.mnist_loop import construir_modelo as construir_modelo_mnist  # noqa: E402
 
 
 def cargar_modelo(checkpoint_path: Path, device: torch.device) -> tuple[nn.Module, dict[str, Any]]:
@@ -29,6 +30,8 @@ def cargar_modelo(checkpoint_path: Path, device: torch.device) -> tuple[nn.Modul
     if "config" not in checkpoint or "ema" not in checkpoint:
         raise ValueError("checkpoint must contain 'config' and 'ema' entries")
     cfg = checkpoint["config"]
+    model_name = cfg.get("modelo", {}).get("nombre", "ddpm_cifar10")
+    construir_modelo = construir_modelo_mnist if model_name == "ddpm_mnist" else construir_modelo_cifar
     model = construir_modelo(cfg)
     model.load_state_dict(checkpoint["ema"])
     model.to(device).eval()

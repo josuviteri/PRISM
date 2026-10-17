@@ -36,6 +36,7 @@ class GaussianDiffusion:
         self.betas = to_device(betas)
         self.alphas = to_device(alphas)
         self.alpha_bars = to_device(alpha_bars)
+        self.alpha_bars_prev = to_device(alpha_bars_prev)
         self.sqrt_alpha_bars = to_device(alpha_bars.sqrt())
         self.sqrt_one_minus_alpha_bars = to_device((1.0 - alpha_bars).sqrt())
         self.sqrt_recip_alpha_bars = to_device(alpha_bars.rsqrt())
@@ -96,6 +97,45 @@ class GaussianDiffusion:
                 sample = mean + self.betas[step].sqrt() * noise
             else:
                 sample = mean
+        if was_training:
+            denoiser.train()
+        return sample.clamp(-1.0, 1.0)
+
+    @torch.no_grad()
+    def sample_ddim(
+        self,
+        denoiser: nn.Module,
+        shape: tuple[int, ...],
+        sampling_steps: int = 50,
+        generator: torch.Generator | None = None,
+        amp: bool = True,
+    ) -> Tensor:
+        """Deterministic DDIM sampling on a subsampled training schedule."""
+        if not 1 <= sampling_steps <= self.timesteps:
+            raise ValueError("sampling_steps must be between 1 and the training timestep count")
+        device = self.betas.device
+        sample = torch.randn(shape, device=device, generator=generator)
+        was_training = denoiser.training
+        denoiser.eval()
+        use_amp = amp and device.type == "cuda"
+        schedule = torch.linspace(
+            0, self.timesteps - 1, sampling_steps, device=device
+        ).round().long()
+        for position in reversed(range(sampling_steps)):
+            step = schedule[position]
+            timesteps = torch.full((shape[0],), step, device=device, dtype=torch.long)
+            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=use_amp):
+                predicted_noise = denoiser(sample, timesteps)
+            predicted_noise = predicted_noise.float()
+            x0 = (
+                self.sqrt_recip_alpha_bars[step] * sample
+                - self.sqrt_recipm1_alpha_bars[step] * predicted_noise
+            ).clamp(-1.0, 1.0)
+            alpha_bar_prev = self.alpha_bars[step - 1] if step > 0 else torch.ones((), device=device)
+            sample = (
+                alpha_bar_prev.sqrt() * x0
+                + (1.0 - alpha_bar_prev).sqrt() * predicted_noise
+            )
         if was_training:
             denoiser.train()
         return sample.clamp(-1.0, 1.0)

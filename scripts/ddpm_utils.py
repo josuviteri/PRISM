@@ -16,7 +16,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.data.loaders import construir_test_loader  # noqa: E402
-from src.training.cifar_loop import GaussianDiffusion, construir_modelo  # noqa: E402
+from src.training.cifar_loop import (  # noqa: E402
+    GaussianDiffusion,
+    _save_image_grid,
+    construir_modelo,
+)
 
 
 def cargar_modelo(checkpoint_path: Path, device: torch.device) -> tuple[nn.Module, dict[str, Any]]:

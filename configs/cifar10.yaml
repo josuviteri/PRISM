@@ -2,7 +2,7 @@
 # es lo que permite reproducir un experimento sabiendo solo que config se uso.
 
 experimento:
-  nombre: cifar10_ddpm_v0.2
+  nombre: cifar10_ddpm_v0.3
   seed: 42
 
 datos:
@@ -23,20 +23,25 @@ modelo:
   diffusion_steps: 1000
   beta_start: 0.0001
   beta_end: 0.02
-  ema_decay: 0.999 # test 0.999 for v.0.2, originally 0.9999
+  ema_decay: 0.9995 # con warmup (ema_warmup): decay efectivo = min(ema_decay, (1+n)/(10+n)). 0.9999 solo tiene sentido en runs de >200k pasos
+  ema_warmup: true
 
 entrenamiento:
   learning_rate: 0.0002
   warmup_steps: 1000
-  epochs: 130 # steps = trainval size / batch size * epochs | cifar10 130 epochs on 128 batch = ~51k steps
+  epochs: 130 # steps = train size / batch size * epochs | train = 45k (val_frac 0.1 de 50k) -> 351 pasos/epoca -> 130 epocas = ~45.6k pasos
   optimizador: adam
   grad_clip: 1.0
   horizontal_flip: true # es util con cifar10, pero desactivar con MNIST
   compile: true
   dispositivo: auto
   directorio_checkpoints: checkpoints
+  reanudar: false              # true = continuar desde checkpoints/<nombre>.pt + .resume.pt si existen
+  muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
+  muestras_n: 64
+  directorio_muestras: samples
 
 wandb:
   proyecto: PRISM
   entidad: Viteritarrak
-  modo: online 
+  modo: online

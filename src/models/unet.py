@@ -52,10 +52,12 @@ class AttentionBlock(nn.Module):
     batch, channels, height, width = x.shape
     normalized = self.norm(x)
     q = self.q(normalized).flatten(2).transpose(1, 2)
-    k = self.k(normalized).flatten(2)
+    k = self.k(normalized).flatten(2).transpose(1, 2)
     v = self.v(normalized).flatten(2).transpose(1, 2)
-    weights = torch.softmax(torch.bmm(q, k) * (channels ** -0.5), dim=-1)
-    h = torch.bmm(weights, v).transpose(1, 2).reshape(batch, channels, height, width)
+    # Single-head attention. SDPA's default scale is channels ** -0.5, identical to the
+    # previous manual bmm/softmax version, so state_dict keys and results are unchanged.
+    h = F.scaled_dot_product_attention(q[:, None], k[:, None], v[:, None])[:, 0]
+    h = h.transpose(1, 2).reshape(batch, channels, height, width)
     return x + self.proj_out(h)
 
 

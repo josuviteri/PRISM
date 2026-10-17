@@ -59,7 +59,7 @@ python -m src.app.serve --checkpoint checkpoints/mejor.pt
 
 # Generar imagenes desde ruido gaussiano usando los pesos EMA.
 python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
-	--output-dir generated --num-samples 64 --DDPM --CIFAR10 # use --DDPM or --DDIM depending on desired reversing technique and --CIFAR10 or --MNIST depending on desired dataset and used model
+	--output-dir generated --num-samples 64 --DDPM # use --DDPM or --DDIM depending on desired reversing technique
 
 # Evaluar IS y FID contra el test de CIFAR-10 (usa 10.000 muestras por defecto).
 python scripts/evaluate_cifar10.py --checkpoint checkpoints/model.pt \

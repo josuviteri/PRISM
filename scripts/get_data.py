@@ -27,7 +27,7 @@ DESTINO = Path("data")
 # `python scripts/get_data.py --hash`.
 FUENTES = [
     # ("https://.../train.tar.gz", "train.tar.gz", "sha256:abc123..."),
-    ("https://drive.google.com/file/d/13_45VYXcMfKuQfWDv0JfPMG09ByArjtC/view?usp=sharing", "train.tar.xz", "sha256:f00c71294e17335ab8d486594b0b16364e255e9f77fa5cab20b4fc5b4179645c")
+    ("https://drive.google.com/file/d/1c03XU6blFiEMeuz6QXDh0TEsa4GNIggt/view?usp=sharing", "data.tar.xz", "sha256:08cb21f1da5e4f4777ff0cc51dff31c377fed0bd5cfedb1c987ccc98d1631758")
 ]
 
 

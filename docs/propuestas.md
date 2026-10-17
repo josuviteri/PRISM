@@ -66,7 +66,7 @@ aprender aquí.
 |                                       |                                                                |
 | ------------------------------------- | -------------------------------------------------------------- |
 | **Dataset**                           |        CIFAR-10 y MNIST                                                        |
-| **Enlace de descarga**                |      https://www.kaggle.com/competitions/cifar-10/data + https://www.kaggle.com/datasets/hojjatk/mnist-dataset                                                          |
+| **Enlace de descarga**                |      https://cave.cs.toronto.edu/kriz/cifar.html + https://www.kaggle.com/datasets/hojjatk/mnist-dataset                                                          |
 | **Tamaño**                            | 60k imágenes - 752.88 MB (Cifar-10) y/o  60k imágenes 54.95MB (MNIST)                             |
 | **Licencia**                          |                                              CC BY 4.0 (Cifar-10), CC BY-SA 3.0 (MNIST)                  |
 | **¿Hace falta registro o solicitud?** | _Si, Kaggle_ |

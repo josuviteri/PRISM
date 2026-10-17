@@ -1,11 +1,12 @@
 # PRISM
 ### _Probabilistic Reverse-diffusion for Image Synthesis with Multimodal guidance_
-_Research project based on DDPM and CFG papers._
+_Research project based on DDPM, DDIM and CFG papers._
 
-Replication  of **Jonathan Ho, Ajay Jain y Pieter Abbeel, 2020 ·  DDPM**, **Jonathan Ho & Tim Salimans, 2022 · (CFG)**, over **MNIST** and **CIFAR-10** datasets,   
+Replication  of **Jonathan Ho, Ajay Jain y Pieter Abbeel, 2020 ·  DDPM**, **Jiaming Song, Chenlin Meng & Stefano Ermon, 2021 · (DDIM)**, **Jonathan Ho & Tim Salimans, 2022 · (CFG)**, over **MNIST** and **CIFAR-10** datasets,   
 with a web UI for experimental guided generation on top.
 
 - **DDPM Paper:** <https://arxiv.org/pdf/2006.11239>
+- **DDIM Paper:** <https://arxiv.org/pdf/2010.02502>
 - **CFG Paper:** <https://arxiv.org/pdf/2207.12598>
 - **Reference of DDPM Implementation:** (https://github.com/hojonathanho/diffusion)
 - **Experiment Tracking:** <enlace al proyecto de W&B — obligatorio>
@@ -57,11 +58,11 @@ python run.py --config configs/mnist.yaml
 python -m src.app.serve --checkpoint checkpoints/mejor.pt
 
 # Generar imagenes desde ruido gaussiano usando los pesos EMA.
-python scripts/inference_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt \
-	--output-dir generated --num-samples 64
+python scripts/inference_cifar10_uncond.py --checkpoint checkpoints/model.pt \
+	--output-dir generated --num-samples 64 --DDIM # use --DDPM or --DDIM depending on desired reversing technique 
 
 # Evaluar IS y FID contra el test de CIFAR-10 (usa 10.000 muestras por defecto).
-python scripts/evaluate_cifar10.py --checkpoint checkpoints/cifar10_ddpm_v0.1.pt \
+python scripts/evaluate_cifar10.py --checkpoint checkpoints/model.pt \
     --batch-size 256 --num-samples 2000
 ```
 

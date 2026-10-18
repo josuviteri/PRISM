@@ -13,15 +13,12 @@ comprueba en la defensa.
 
 ---
 
-| Fecha | Tarea | Herramienta | Qué devolvió | Qué hicimos y por qué |
-|---|---|---|---|---|
-| | | | | |
+| Tarea | Herramienta | Qué devolvió | Qué hicimos y por qué |
+|---|---|---|---|
+| Papers and Research | AlphaXiv |  |  |
+| Planning and Research | Claude web CLI (Sonnet 5.5) |  |  |
+| Debugging | Gemini Flash 3.6 web CLI |  |   |
+| Development | GitHub Copilot (GPT-5.6 Luna) | |   |
+| Autocompletion | GitHub Copilot |  |  |
 
 ---
-
-<!--
-Ejemplos del nivel que se espera (bórralos cuando tengas los tuyos):
-
-| 12-nov | Escribir el Dataset con el subset del paper | Claude Code | Clase completa con __len__ y __getitem__ | **Aceptado con cambios.** Normalizaba con estadísticas del conjunto entero; lo cambiamos a las de train para no meter fuga |
-| 15-nov | «¿Por qué mi loss no baja?» | Claude | Cinco hipótesis | **Rechazado como análisis.** Lo usamos como lista de comprobación; el diagnóstico (lr 100× alto) lo encontramos con el LR range test |
--->

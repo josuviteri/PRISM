@@ -1,5 +1,5 @@
 """Compute Inception Score and FID for a CIFAR-10 DDPM checkpoint."""
-
+# TODO: INCLUIR DDIM EN LA EVALUACIÓN
 from __future__ import annotations
 
 import argparse
@@ -86,6 +86,9 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     parser.add_argument("--seed", type=int, default=42)
+    inference = parser.add_mutually_exclusive_group(required=True)
+    inference.add_argument("--DDPM", action="store_true", help="Use the DDPM inference method for sampling")
+    inference.add_argument("--DDIM", action="store_true", help="Use the DDIM inference method for sampling")
     args = parser.parse_args()
 
     if args.num_samples < 2 or args.batch_size < 1:
@@ -133,7 +136,7 @@ def main() -> int:
         while seen < args.num_samples:
             count = min(args.batch_size, args.num_samples - seen)
             batch_started = time.perf_counter()
-            generated = diffusion.sample(model, (count, 3, 32, 32))
+            generated = diffusion.sample(model, (count, 1, 28, 28)) if cfg["datos"]["nombre"] == "mnist" else diffusion.sample(model, (count, 3, 32, 32))
             logits = _inception_batch(inception, a_rgb(generated, mean, std).to(device))
             generated_logits.append(logits.cpu())
             generated_features.append(captured_features.pop().cpu())

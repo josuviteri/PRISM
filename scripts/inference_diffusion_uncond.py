@@ -32,9 +32,6 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     parser.add_argument("--seed", type=int, default=None)
-    dataset = parser.add_mutually_exclusive_group(required=True)
-    dataset.add_argument("--MNIST", action="store_true", help="Use the MNIST dataset for sampling")
-    dataset.add_argument("--CIFAR10", action="store_true", help="Use the CIFAR10 dataset for sampling")
     inference = parser.add_mutually_exclusive_group(required=True)
     inference.add_argument("--DDPM", action="store_true", help="Use the DDPM inference method for sampling")
     inference.add_argument("--DDIM", action="store_true", help="Use the DDIM inference method for sampling")
@@ -67,13 +64,13 @@ def main() -> int:
     while written < args.num_samples:
         count = min(args.batch_size, args.num_samples - written)
         batch_started = time.perf_counter()
-        if args.DDIM and args.MNIST:
+        if cfg["datos"]["nombre"] == "mnist" and args.DDIM:
             generated = diffusion.sample_ddim(model, (count, 1, 28, 28), sampling_steps=sampling_steps)
-        elif args.DDIM and args.CIFAR10:
+        elif cfg["datos"]["nombre"] == "cifar10" and args.DDIM:
             generated = diffusion.sample_ddim(model, (count, 3, 32, 32), sampling_steps=sampling_steps)
-        elif args.DDPM and args.MNIST:
+        elif args.DDPM and cfg["datos"]["nombre"] == "mnist":
             generated = diffusion.sample(model, (count, 1, 28, 28))
-        elif args.DDPM and args.CIFAR10:
+        elif args.DDPM and cfg["datos"]["nombre"] == "cifar10":
             generated = diffusion.sample(model, (count, 3, 32, 32))
         generated_batches.append(generated)
         written += count

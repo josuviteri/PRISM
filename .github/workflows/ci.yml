@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  reproducibilidad:
+  tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -23,5 +23,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Debug Test
-        run: python -m pytest tests/debug_test.py -q
+      - name: Run test suite
+        run: python -m pytest tests/ -q

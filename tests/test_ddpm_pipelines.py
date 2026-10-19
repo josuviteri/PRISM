@@ -45,7 +45,12 @@ def test_loader_shapes_splits_and_finite_normalized_values(dataset, request):
     assert len(test) == 5
     assert image.shape == (channels, size, size)
     assert image.dtype == torch.float32 and torch.isfinite(image).all()
-    assert -1.0 <= image.min() <= image.max() <= 1.0
+    if dataset == "mnist":
+        train_images = torch.stack([train[index][0] for index in range(len(train))])
+        assert torch.isclose(train_images.mean(), torch.tensor(0.0), atol=1e-5)
+        assert torch.isclose(train_images.std(unbiased=False), torch.tensor(1.0), atol=1e-5)
+    else:
+        assert -1.0 <= image.min() <= image.max() <= 1.0
     assert 0 <= label <= 9
 
 

@@ -31,7 +31,7 @@ def test_dependencies_detects_unpinned_requirements(tmp_path):
     (tmp_path / "requirements.txt").write_text("torch==2.0\nnumpy\n", encoding="utf-8")
     result = checker.check_dependencias(tmp_path)
     assert result.pts == 5
-    assert any("faltan por fijar" in message for message in result.mal)
+    assert any("solo 1/2" in message for message in result.mal)
 
 
 def test_seeds_finds_all_rng_families_and_flags_scattered_files(tmp_path):

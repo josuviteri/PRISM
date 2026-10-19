@@ -6,12 +6,12 @@ import csv
 import struct
 from pathlib import Path
 
-import numpy as np
 import pytest
-from PIL import Image
 
 
-def _write_idx(root: Path, prefix: str, images: np.ndarray, labels: np.ndarray) -> None:
+def _write_idx(root: Path, prefix: str, images, labels) -> None:
+    import numpy as np
+
     image_name = "train-images.idx3-ubyte" if prefix == "train" else "t10k-images.idx3-ubyte"
     label_name = "train-labels.idx1-ubyte" if prefix == "train" else "t10k-labels.idx1-ubyte"
     (root / image_name).write_bytes(
@@ -25,6 +25,8 @@ def _write_idx(root: Path, prefix: str, images: np.ndarray, labels: np.ndarray) 
 @pytest.fixture
 def mnist_root(tmp_path: Path) -> Path:
     """Create a deterministic miniature MNIST IDX directory."""
+    import numpy as np
+
     root = tmp_path / "mnist"
     root.mkdir()
     train = np.zeros((20, 28, 28), dtype=np.uint8)
@@ -38,6 +40,9 @@ def mnist_root(tmp_path: Path) -> Path:
 @pytest.fixture
 def cifar_root(tmp_path: Path) -> Path:
     """Create a miniature CIFAR PNG export and matching labels CSV."""
+    import numpy as np
+    from PIL import Image
+
     root = tmp_path / "cifar-10"
     (root / "train").mkdir(parents=True)
     (root / "test").mkdir()

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRISM — Diffusion Explorer</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <main>
+    <nav aria-label="Application header">
+      <a class="brand" href="/" aria-label="PRISM home"><span class="brand-mark">P</span><span>PRISM</span></a>
+      <span class="nav-label">Diffusion model explorer</span>
+      <span class="local-badge"><i></i> Local runtime</span>
+    </nav>
+
+    <header class="hero">
+      <div><p class="eyebrow">GENERATIVE RESEARCH WORKBENCH</p><h1>Explore a reverse<br>diffusion trajectory.</h1></div>
+      <p class="hero-copy">Load the EMA checkpoints you retrieved from Weights &amp; Biases, control the sampler, and compare Gaussian noise <em>x<sub>T</sub></em> with the final sample <em>x<sub>0</sub></em>.</p>
+    </header>
+
+    <section class="workspace" aria-label="Sampling workspace">
+      <form id="form" class="control-panel">
+        <div class="panel-heading"><div><p class="eyebrow">SAMPLING SETUP</p><h2>Configure a run</h2></div><span class="model-type" id="model-type">Loading models</span></div>
+        <label class="field full">Checkpoint
+          <select id="checkpoint" required aria-describedby="model-details"></select>
+          <small id="model-details">Reading saved checkpoint metadata…</small>
+        </label>
+        <fieldset class="sampler-field"><legend>Reverse sampler</legend><div class="segmented">
+          <label><input type="radio" name="method" value="ddim" checked><span>DDIM <small>Flexible steps</small></span></label>
+          <label><input type="radio" name="method" value="ddpm"><span>DDPM <small>Full schedule</small></span></label>
+        </div></fieldset>
+        <div class="field-grid">
+          <label class="field" id="steps-field">Denoising steps <output id="steps-output">50</output>
+            <input id="steps" type="range" min="1" max="1000" value="50"><small id="steps-description">Fewer steps generate faster; more preserve the learned trajectory.</small>
+          </label>
+          <label class="field">Images <output id="samples-output">4</output>
+            <input id="samples" type="range" min="1" max="16" value="4"><small>Generated in one visual grid.</small>
+          </label>
+        </div>
+        <div class="field-grid bottom-fields">
+          <label class="field">Random seed<input id="seed" type="number" value="42" step="1"></label>
+          <button class="dice" id="randomise" type="button" title="Choose a random seed" aria-label="Choose a random seed">↻</button>
+        </div>
+        <button class="generate" id="generate" type="submit"><span>Generate samples</span><b>↗</b></button>
+        <div id="status" class="status" role="status" aria-live="polite"><span></span><p>Ready when you are.</p></div>
+      </form>
+
+      <section class="stage" aria-label="Generation result">
+        <div class="stage-top"><div><p class="eyebrow">OUTPUT</p><h2>Reverse process</h2></div><div id="run-summary" class="run-summary">Awaiting a generation</div></div>
+        <div id="empty" class="empty-state"><div class="orbit"><span></span><span></span><span></span></div><h3>Set the trajectory in motion</h3><p>Your initial noise and generated image grid will appear here.</p></div>
+        <div id="results" class="results" hidden>
+          <article class="image-card"><div class="image-header"><div><p>START</p><h3>x<sub>T</sub> · Gaussian noise</h3></div><a id="download-noise" download="prism-noise.png">Download</a></div><img id="noise" alt="Initial Gaussian noise grid"></article>
+          <div class="trajectory" aria-hidden="true"><span></span><p>denoise</p><b>→</b></div>
+          <article class="image-card"><div class="image-header"><div><p>FINISH</p><h3>x<sub>0</sub> · Generated samples</h3></div><a id="download-output" download="prism-samples.png">Download</a></div><img id="output" alt="Generated image grid"></article>
+        </div>
+        <section id="trajectory-view" class="trajectory-view" hidden aria-label="Denoising trajectory viewer">
+          <div class="trajectory-heading"><div><p class="eyebrow">SINGLE-RUN TRAJECTORY</p><h3>Watch the image emerge</h3></div><p id="frame-label">Step 0</p></div>
+          <div class="trajectory-workspace"><img id="trajectory-image" alt="Selected denoising trajectory frame"><div class="trajectory-controls">
+            <p>These snapshots come from the same sampling run. Scrub through the reverse process without generating again.</p>
+            <input id="trajectory-slider" type="range" min="0" max="0" value="0" aria-label="Trajectory frame">
+            <div><button id="previous-frame" type="button" aria-label="Previous trajectory frame">←</button><button id="play-trajectory" type="button">Play trajectory</button><button id="next-frame" type="button" aria-label="Next trajectory frame">→</button></div>
+          </div></div>
+        </section>
+      </section>
+    </section>
+    <footer><span>PRISM · Probabilistic Reverse-diffusion for Image Synthesis</span><span>EMA checkpoint inference · MNIST / CIFAR-10</span></footer>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

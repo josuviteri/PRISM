@@ -107,6 +107,10 @@ python -m src.app.serve --checkpoint checkpoints/mejor.pt
 python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
 	--output-dir generated --num-samples 64 --DDPM # use --DDPM or --DDIM depending on desired reversing technique
 
+# DDIM permits a shorter or longer (up to the training schedule) reverse process.
+python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
+    --output-dir generated_ddim_20 --num-samples 64 --DDIM --denoising-steps 20
+
 # Evaluate FID and IS against the full CIFAR-10 test set or a subset (default: 10k samples).
 python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/model.pt \
     --batch-size 256 --num-samples 2000 --DDPM # use --DDPM or --DDIM depending on desired reversing technique

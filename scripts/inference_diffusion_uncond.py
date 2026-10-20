@@ -32,6 +32,16 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--denoising-steps",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Number of reverse-diffusion timesteps for DDIM. Defaults to 50, "
+            "or the checkpoint's timestep count when it is lower."
+        ),
+    )
     inference = parser.add_mutually_exclusive_group(required=True)
     inference.add_argument("--DDPM", action="store_true", help="Use the DDPM inference method for sampling")
     inference.add_argument("--DDIM", action="store_true", help="Use the DDIM inference method for sampling")
@@ -50,7 +60,18 @@ def main() -> int:
 
     model, cfg = cargar_modelo(args.checkpoint, device)
     diffusion = construir_difusion(cfg, device)
-    sampling_steps = 50 if args.DDIM else diffusion.timesteps
+    if args.denoising_steps is not None:
+        if not args.DDIM:
+            parser.error("--denoising-steps is only supported with --DDIM")
+        if not 1 <= args.denoising_steps <= diffusion.timesteps:
+            parser.error(
+                "--denoising-steps must be between 1 and the checkpoint's "
+                f"timestep count ({diffusion.timesteps})"
+            )
+    if args.DDIM:
+        sampling_steps = args.denoising_steps or min(50, diffusion.timesteps)
+    else:
+        sampling_steps = diffusion.timesteps
     print(
         f"checkpoint={args.checkpoint} device={device} "
         f"diffusion_steps={sampling_steps} samples={args.num_samples} "

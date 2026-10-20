@@ -108,14 +108,14 @@ python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
 	--output-dir generated --num-samples 64 --DDPM # use --DDPM or --DDIM depending on desired reversing technique
 
 # Evaluate FID and IS against the full CIFAR-10 test set or a subset (default: 10k samples).
-python scripts/evaluate_cifar10.py --checkpoint checkpoints/model.pt \
-    --batch-size 256 --num-samples 2000
+python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/model.pt \
+    --batch-size 256 --num-samples 2000 --DDPM # use --DDPM or --DDIM depending on desired reversing technique
 ```
 
 MNIST expects four uncompressed IDX files at `data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`, `t10k-images.idx3-ubyte` and `t10k-labels.idx1-ubyte`. Images are maintained in `28x28` with a single channel; normalization is calculated only with the train split.
 
 Evaluation downloads weights from Inception-v3 first time and requires `torchvision`,
-included at `requirements.txt`. For a fast check, try to reduce the cost of evaluation by using a subset from the test set.
+included at `requirements.txt`. For a fast check, try to reduce the cost of evaluation by using a subset from the test set; subsets smaller than the default 10,000 samples are selected with balanced class stratification.
 
 ### Reproducibility
 

@@ -1,5 +1,4 @@
 """Compute Inception Score and FID for a CIFAR-10 DDPM checkpoint."""
-# TODO: INCLUIR DDIM EN LA EVALUACIÓN
 from __future__ import annotations
 
 import argparse
@@ -10,6 +9,7 @@ import torch
 from torch import Tensor
 import torch.nn.functional as F
 from tqdm import tqdm
+from torch.utils.data import DataLoader, Dataset, Subset
 
 try:
     from .ddpm_utils import a_rgb, cargar_modelo, construir_difusion, construir_test_loader_con_batch, obtener_normalizacion
@@ -78,6 +78,42 @@ def _inception_score(logits: Tensor, splits: int = 10) -> tuple[float, float]:
     return float(values.mean().item()), float(values.std(unbiased=False).item())
 
 
+def _stratified_indices(dataset: Dataset, num_samples: int, seed: int) -> list[int]:
+    """Select a deterministic, class-balanced subset of a labelled dataset."""
+    if not 0 < num_samples < len(dataset):
+        raise ValueError("num_samples must be between 1 and the dataset size")
+
+    labels = [int(dataset[index][1]) for index in range(len(dataset))]
+    by_class: dict[int, list[int]] = {}
+    for index, label in enumerate(labels):
+        by_class.setdefault(label, []).append(index)
+
+    generator = torch.Generator().manual_seed(seed)
+    classes = sorted(by_class)
+    per_class, remainder = divmod(num_samples, len(classes))
+    extra_classes = set(torch.randperm(len(classes), generator=generator)[:remainder].tolist())
+    selected: list[int] = []
+    for class_index, label in enumerate(classes):
+        count = per_class + (class_index in extra_classes)
+        class_indices = torch.tensor(by_class[label], dtype=torch.long)
+        permutation = torch.randperm(len(class_indices), generator=generator)
+        selected.extend(class_indices[permutation[:count]].tolist())
+    selected.sort()
+    return selected
+
+
+def _stratified_loader(loader: DataLoader, num_samples: int, seed: int) -> DataLoader:
+    """Return a loader over a deterministic class-balanced test subset."""
+    indices = _stratified_indices(loader.dataset, num_samples, seed)
+    return DataLoader(
+        Subset(loader.dataset, indices),
+        batch_size=loader.batch_size,
+        shuffle=False,
+        num_workers=loader.num_workers,
+        pin_memory=loader.pin_memory,
+    )
+
+
 def main() -> int:
     """Evaluate generated images against the local CIFAR-10 test set."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -106,6 +142,8 @@ def main() -> int:
     if args.num_samples > len(loader.dataset):
         parser.error(f"--num-samples cannot exceed the test set size ({len(loader.dataset)})")
     mean, std = obtener_normalizacion(loader)
+    if args.num_samples < len(loader.dataset):
+        loader = _stratified_loader(loader, args.num_samples, args.seed)
     diffusion = construir_difusion(cfg, device)
     inception, hook, captured_features = _load_inception(device)
     print(
@@ -136,7 +174,14 @@ def main() -> int:
         while seen < args.num_samples:
             count = min(args.batch_size, args.num_samples - seen)
             batch_started = time.perf_counter()
-            generated = diffusion.sample(model, (count, 1, 28, 28)) if cfg["datos"]["nombre"] == "mnist" else diffusion.sample(model, (count, 3, 32, 32))
+            if cfg["datos"]["nombre"] == "cifar10" and args.DDIM:
+                generated = diffusion.sample_ddim(model, (count, 3, 32, 32))
+            elif args.DDPM and cfg["datos"]["nombre"] == "cifar10":
+                generated = diffusion.sample(model, (count, 3, 32, 32))
+            elif cfg["datos"]["nombre"] == "mnist":
+                print("MNIST is not supported for IS/FID evaluation; skipping generation")
+            else:
+                raise ValueError(f"Unsupported dataset for IS/FID evaluation: {cfg['datos']['nombre']}")
             logits = _inception_batch(inception, a_rgb(generated, mean, std).to(device))
             generated_logits.append(logits.cpu())
             generated_features.append(captured_features.pop().cpu())

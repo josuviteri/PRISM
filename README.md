@@ -100,12 +100,16 @@ python run.py --config configs/cifar10.yaml
 # Unconditional DDPM training over local MNIST IDX.
 python run.py --config configs/mnist.yaml
 
+# Improved LeNet CNN for MNIST dataset IS and FID metric evaluations.
+python run.py --config configs/mnist_evaluator.yaml
+
 # Web App from trained weights.
 python -m src.app.serve --checkpoint checkpoints/mejor.pt
 
 # Generate images from gaussian noise using EMA weights.
 python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
-	--output-dir generated --num-samples 64 --DDPM # use --DDPM or --DDIM depending on desired reversing technique
+	--output-dir generated --num-samples 64 --DDPM 
+    # use --DDPM or --DDIM depending on desired reversing technique
 
 # DDIM permits a shorter or longer (up to the training schedule) reverse process.
 python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
@@ -113,7 +117,14 @@ python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
 
 # Evaluate FID and IS against the full CIFAR-10 test set or a subset (default: 10k samples).
 python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/model.pt \
-    --batch-size 256 --num-samples 2000 --DDPM # use --DDPM or --DDIM depending on desired reversing technique
+    --batch-size 256 --num-samples 2000 --DDPM 
+    # use --DDPM or --DDIM depending on desired reversing technique
+
+# Evaluate FID and IS against the full CIFAR-10 test set or a subset (default: 10k samples).
+python scripts/evaluate_diffusion_mnist.py --checkpoint checkpoints/model.pt  \
+    --batch-size 256 --num-samples 2000 \
+    --evaluator-checkpoint checkpoints/model.pt --DDPM 
+    # use --DDPM or --DDIM depending on desired reversing technique
 ```
 
 MNIST expects four uncompressed IDX files at `data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`, `t10k-images.idx3-ubyte` and `t10k-labels.idx1-ubyte`. Images are maintained in `28x28` with a single channel; normalization is calculated only with the train split.

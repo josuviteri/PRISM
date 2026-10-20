@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.data.loaders import construir_test_loader  # noqa: E402
+from src.training import mnist_evaluator_loop  # noqa: E402
 
 from src.training.diffusion_loop import (
     GaussianDiffusion,
@@ -34,6 +35,20 @@ def cargar_modelo(checkpoint_path: Path, device: torch.device) -> tuple[nn.Modul
     model.load_state_dict(checkpoint["ema"])
     model.to(device).eval()
     return model, cfg
+
+def cargar_evaluador(
+    checkpoint_path: Path, device: torch.device
+) -> tuple[nn.Module, dict[str, Any], dict[str, list[float]] | None]:
+    """Load the MNIST LeNet evaluator, configuration, and saved train normalization."""
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    state_dict = checkpoint.get("model", checkpoint.get("state_dict"))
+    if "config" not in checkpoint or state_dict is None:
+        raise ValueError("evaluator checkpoint must contain 'config' and 'model' entries")
+    cfg = checkpoint["config"]
+    model = mnist_evaluator_loop.construir_modelo(cfg)
+    model.load_state_dict(state_dict)
+    model.to(device).eval()
+    return model, cfg, checkpoint.get("normalizacion")
 
 
 def construir_difusion(cfg: dict[str, Any], device: torch.device) -> GaussianDiffusion:

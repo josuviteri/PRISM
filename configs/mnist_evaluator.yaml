@@ -1,0 +1,43 @@
+# Clasificador MNIST usado exclusivamente como extractor para IS-MNIST y FID-MNIST.
+# Se selecciona por validacion; test se reserva para la evaluacion generativa final.
+
+experimento:
+  nombre: mnist_evaluator_v0.1
+  seed: 42
+
+datos:
+  nombre: mnist
+  ruta: data/data/mnist
+  val_frac: 0.1
+  seed: 42
+  subset: null
+  batch_size: 128
+  num_workers: 4
+  pin_memory: true
+  augment: false
+
+modelo:
+  nombre: lenet_mnist_evaluator
+  channels: [32, 64, 128]
+  embedding_dim: 128
+  num_classes: 10
+
+entrenamiento:
+  optimizador: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs: 20
+  early_stopping_patience: 4
+  scheduler:
+    nombre: reduce_lr_on_plateau
+    factor: 0.2
+    patience: 2
+    min_lr: 0.00001
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
+  max_batches: null
+
+wandb:
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: online

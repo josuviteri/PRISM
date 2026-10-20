@@ -27,6 +27,8 @@ from src.utils.tracking import abrir_run  # noqa: E402
 from src.data.loaders import construir_loaders  # noqa: E402
 from src.training import diffusion_loop # noqa: E402
 
+# mnist evaluator
+from src.training import mnist_evaluator_loop  # noqa: E402
 
 def cargar_config(ruta: Path) -> dict:
     with open(ruta, encoding="utf-8") as f:
@@ -60,7 +62,10 @@ def main() -> int:
     train_loader, val_loader = construir_loaders(cfg)
 
     # 4 · modelo
-    modelo = diffusion_loop.construir_modelo(cfg)
+    if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+        modelo = mnist_evaluator_loop.construir_modelo(cfg)
+    else:
+        modelo = diffusion_loop.construir_modelo(cfg)
 
     # 5 · entrenar y evaluar
     checkpoint = Path(cfg["entrenamiento"].get("directorio_checkpoints", "checkpoints")) / f'{cfg["experimento"]["nombre"]}.pt'
@@ -70,10 +75,20 @@ def main() -> int:
             return 2
         estado = torch.load(checkpoint, map_location="cpu", weights_only=True)
         modelo.load_state_dict(estado["ema"])
-        modelo.to(diffusion_loop._device(cfg))
+        if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+            modelo.to(mnist_evaluator_loop._device(cfg))
+        else:
+            modelo.to(diffusion_loop._device(cfg))
     else:
-        diffusion_loop.entrenar(modelo, train_loader, val_loader, cfg, run)
-    metricas = diffusion_loop.evaluar(modelo, val_loader, cfg)
+        if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+            mnist_evaluator_loop.entrenar(modelo, train_loader, val_loader, cfg, run)
+        else:
+            diffusion_loop.entrenar(modelo, train_loader, val_loader, cfg, run)
+    
+    if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+        metricas = mnist_evaluator_loop.evaluar(modelo, val_loader, cfg)
+    else:
+        metricas = diffusion_loop.evaluar(modelo, val_loader, cfg)
 
     # 6 · el smoke test TIENE que imprimir una metrica: es la prueba de que el
     #     pipeline llega hasta el final. El checker lo comprueba.

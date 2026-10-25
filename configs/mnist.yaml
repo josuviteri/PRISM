@@ -42,6 +42,15 @@ entrenamiento:
   muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
   muestras_n: 64
   directorio_muestras: samples
+
+metricas:
+  checkpoint: checkpoints/mnist_ddpm_v0.2.pt
+  evaluator_checkpoint: checkpoints/mnist_evaluator_v0.1.pt
+  num_samples: 2000
+  batch_size: 128
+  dispositivo: auto
+  metodo: DDIM
+
 wandb:
   proyecto: PRISM
   entidad: Viteritarrak

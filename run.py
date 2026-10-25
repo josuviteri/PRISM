@@ -23,9 +23,10 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.utils.seed_demo import fijar_seed     # noqa: E402
-from src.utils.tracking import abrir_run  # noqa: E402
+from src.utils.tracking import abrir_run, registrar  # noqa: E402
 from src.data.loaders import construir_loaders  # noqa: E402
 from src.training import diffusion_loop # noqa: E402
+from scripts import evaluate_diffusion_mnist, evaluate_diffusion_cifar10  # noqa: E402
 
 # mnist evaluator
 from src.training import mnist_evaluator_loop  # noqa: E402
@@ -44,6 +45,8 @@ def main() -> int:
                     help="usa configs/smoke.yaml: el pipeline entero en miniatura")
     ap.add_argument("--solo-evaluar", action="store_true",
                     help="carga el checkpoint y evalua, sin entrenar")
+    ap.add_argument("--solo-metricas", action="store_true",
+                        help="solo se evaluan las métricas FID y IS, sin entrenar")
     args = ap.parse_args()
 
     ruta = Path("configs/smoke.yaml") if args.smoke else args.config
@@ -55,6 +58,57 @@ def main() -> int:
     # 1 · reproducibilidad, antes que nada
     fijar_seed(cfg["experimento"]["seed"])
 
+    if args.solo_metricas:
+        metric_cfg = cfg.get("metricas")
+        if not isinstance(metric_cfg, dict):
+            print("error: falta la seccion 'metricas' en la configuracion", file=sys.stderr)
+            return 2
+        dataset = cfg.get("datos", {}).get("nombre")
+        checkpoint = Path(metric_cfg.get("checkpoint", ""))
+        if not checkpoint.is_file():
+            print(f"error: no existe el checkpoint {checkpoint}", file=sys.stderr)
+            return 2
+        method = str(metric_cfg.get("metodo", "DDPM")).upper()
+        try:
+            if dataset == "mnist":
+                evaluator_checkpoint = Path(metric_cfg.get("evaluator_checkpoint", ""))
+                if not evaluator_checkpoint.is_file():
+                    print(f"error: no existe el checkpoint evaluador {evaluator_checkpoint}", file=sys.stderr)
+                    return 2
+            elif dataset != "cifar10":
+                print(f"error: dataset no soportado para metricas: {dataset}", file=sys.stderr)
+                return 2
+        except TypeError:
+            print("error: la configuracion de metricas contiene una ruta invalida", file=sys.stderr)
+            return 2
+
+        run = abrir_run(cfg, evaluar=True)
+        try:
+            common = {
+                "checkpoint": checkpoint,
+                "num_samples": int(metric_cfg.get("num_samples", 10000)),
+                "batch_size": int(metric_cfg.get("batch_size", 64)),
+                "device_name": str(metric_cfg.get("dispositivo", "auto")),
+                "seed": int(cfg["experimento"]["seed"]),
+                "method": method,
+            }
+            if dataset == "mnist":
+                metricas = evaluate_diffusion_mnist.evaluar(
+                    evaluator_checkpoint=evaluator_checkpoint, **common
+                )
+            else:
+                metricas = evaluate_diffusion_cifar10.evaluar(**common)
+            registrar(run, metricas)
+            print("\n=== metricas ===")
+            for key, value in metricas.items():
+                print(f"{key}: {value:.4f}")
+        finally:
+            if run is not None:
+                run.finish()
+        return 0
+
+    mnist_evaluator = cfg["modelo"]["nombre"] == "lenet_mnist_evaluator"
+
     # 2 · seguimiento del experimento
     run = abrir_run(cfg)
 
@@ -62,7 +116,7 @@ def main() -> int:
     train_loader, val_loader = construir_loaders(cfg)
 
     # 4 · modelo
-    if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+    if mnist_evaluator:
         modelo = mnist_evaluator_loop.construir_modelo(cfg)
     else:
         modelo = diffusion_loop.construir_modelo(cfg)
@@ -75,17 +129,14 @@ def main() -> int:
             return 2
         estado = torch.load(checkpoint, map_location="cpu", weights_only=True)
         modelo.load_state_dict(estado["ema"])
-        if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
-            modelo.to(mnist_evaluator_loop._device(cfg))
-        else:
-            modelo.to(diffusion_loop._device(cfg))
+        modelo.to(diffusion_loop._device(cfg))
     else:
-        if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+        if mnist_evaluator:
             mnist_evaluator_loop.entrenar(modelo, train_loader, val_loader, cfg, run)
         else:
             diffusion_loop.entrenar(modelo, train_loader, val_loader, cfg, run)
     
-    if cfg["modelo"]["nombre"] == "lenet_mnist_evaluator":
+    if mnist_evaluator:
         metricas = mnist_evaluator_loop.evaluar(modelo, val_loader, cfg)
     else:
         metricas = diffusion_loop.evaluar(modelo, val_loader, cfg)

@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 
-def abrir_run(cfg: dict) -> Any | None:
+
+def abrir_run(cfg: dict, evaluar: bool = False) -> Any | None:
     """Abre un run de W&B, o devuelve None si esta desactivado."""
     wcfg = cfg.get("wandb", {})
     if wcfg.get("modo") == "disabled":
@@ -24,7 +25,11 @@ def abrir_run(cfg: dict) -> Any | None:
     return wandb.init(
         project=wcfg.get("proyecto", "tiiac-2026"),
         entity=wcfg.get("entidad"),
-        name=cfg["experimento"]["nombre"],
+        name=(
+            f"{cfg['experimento']['nombre']}_eval"
+            if evaluar
+            else cfg["experimento"]["nombre"]
+        ),
         config=cfg,
         mode=wcfg.get("modo", "online"),
     )

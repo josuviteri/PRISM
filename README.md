@@ -120,11 +120,15 @@ python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/model.pt \
     --batch-size 256 --num-samples 2000 --DDPM 
     # use --DDPM or --DDIM depending on desired reversing technique
 
-# Evaluate FID and IS against the full CIFAR-10 test set or a subset (default: 10k samples).
+# Evaluate FID and IS against the full MNIST test set or a subset (default: 10k samples).
 python scripts/evaluate_diffusion_mnist.py --checkpoint checkpoints/model.pt  \
     --batch-size 256 --num-samples 2000 \
-    --evaluator-checkpoint checkpoints/model.pt --DDPM 
+    --evaluator-checkpoint checkpoints/mnist_evaluator_v0.1.pt --DDPM
     # use --DDPM or --DDIM depending on desired reversing technique
+
+# Calculate metrics and log FID/IS to W&B. Paths and sampling options live in the config.
+python run.py --solo-metricas --config configs/cifar10.yaml
+python run.py --solo-metricas --config configs/mnist.yaml
 ```
 
 MNIST expects four uncompressed IDX files at `data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`, `t10k-images.idx3-ubyte` and `t10k-labels.idx1-ubyte`. Images are maintained in `28x28` with a single channel; normalization is calculated only with the train split.

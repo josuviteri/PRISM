@@ -114,50 +114,48 @@ def _stratified_loader(loader: DataLoader, num_samples: int, seed: int) -> DataL
     )
 
 
-def main() -> int:
-    """Evaluate generated images against the local CIFAR-10 test set."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--num-samples", type=int, default=10000)
-    parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
-    parser.add_argument("--seed", type=int, default=42)
-    inference = parser.add_mutually_exclusive_group(required=True)
-    inference.add_argument("--DDPM", action="store_true", help="Use the DDPM inference method for sampling")
-    inference.add_argument("--DDIM", action="store_true", help="Use the DDIM inference method for sampling")
-    args = parser.parse_args()
-
-    if args.num_samples < 2 or args.batch_size < 1:
-        parser.error("--num-samples must be at least 2 and --batch-size must be positive")
-    if not args.checkpoint.is_file():
-        parser.error(f"checkpoint does not exist: {args.checkpoint}")
-    if args.device == "cuda" and not torch.cuda.is_available():
-        parser.error("CUDA was requested but is not available")
-    device_name = "cuda" if args.device == "auto" and torch.cuda.is_available() else "cpu" if args.device == "auto" else args.device
+def evaluar(
+    checkpoint: Path,
+    num_samples: int = 10000,
+    batch_size: int = 64,
+    device_name: str = "auto",
+    seed: int = 42,
+    method: str = "DDPM",
+) -> dict[str, float]:
+    """Evaluate a CIFAR-10 checkpoint and return IS/FID metrics."""
+    if num_samples < 2 or batch_size < 1:
+        raise ValueError("num_samples must be at least 2 and batch_size must be positive")
+    if not checkpoint.is_file():
+        raise FileNotFoundError(f"checkpoint does not exist: {checkpoint}")
+    if device_name == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested but is not available")
+    if method not in {"DDPM", "DDIM"}:
+        raise ValueError("method must be DDPM or DDIM")
+    device_name = "cuda" if device_name == "auto" and torch.cuda.is_available() else "cpu" if device_name == "auto" else device_name
     device = torch.device(device_name)
-    torch.manual_seed(args.seed)
+    torch.manual_seed(seed)
 
-    model, cfg = cargar_modelo(args.checkpoint, device)
-    loader = construir_test_loader_con_batch(cfg, args.batch_size)
-    if args.num_samples > len(loader.dataset):
-        parser.error(f"--num-samples cannot exceed the test set size ({len(loader.dataset)})")
+    model, cfg = cargar_modelo(checkpoint, device)
+    loader = construir_test_loader_con_batch(cfg, batch_size)
+    if num_samples > len(loader.dataset):
+        raise ValueError(f"num_samples cannot exceed the test set size ({len(loader.dataset)})")
     mean, std = obtener_normalizacion(loader)
-    if args.num_samples < len(loader.dataset):
-        loader = _stratified_loader(loader, args.num_samples, args.seed)
+    if num_samples < len(loader.dataset):
+        loader = _stratified_loader(loader, num_samples, seed)
     diffusion = construir_difusion(cfg, device)
     inception, hook, captured_features = _load_inception(device)
     print(
-        f"checkpoint={args.checkpoint} device={device} "
-        f"diffusion_steps={diffusion.timesteps} samples={args.num_samples} "
-        f"batch_size={args.batch_size} seed={args.seed}"
+        f"checkpoint={checkpoint} device={device} "
+        f"diffusion_steps={diffusion.timesteps} samples={num_samples} "
+        f"batch_size={batch_size} seed={seed}"
     )
 
     real_features = []
     seen = 0
     print("Extracting features from the real test set...")
     with torch.inference_mode():
-        for images, _ in tqdm(loader, total=(args.num_samples + args.batch_size - 1) // args.batch_size):
-            count = min(images.shape[0], args.num_samples - seen)
+        for images, _ in tqdm(loader, total=(num_samples + batch_size - 1) // batch_size):
+            count = min(images.shape[0], num_samples - seen)
             if count <= 0:
                 break
             _inception_batch(inception, a_rgb(images[:count], mean, std).to(device))
@@ -169,17 +167,15 @@ def main() -> int:
     seen = 0
     print("Generating and extracting features from Gaussian noise...")
     generation_started = time.perf_counter()
-    progress = tqdm(total=args.num_samples, unit="img", desc="Generating samples")
+    progress = tqdm(total=num_samples, unit="img", desc="Generating samples")
     with torch.inference_mode():
-        while seen < args.num_samples:
-            count = min(args.batch_size, args.num_samples - seen)
+        while seen < num_samples:
+            count = min(batch_size, num_samples - seen)
             batch_started = time.perf_counter()
-            if cfg["datos"]["nombre"] == "cifar10" and args.DDIM:
+            if cfg["datos"]["nombre"] == "cifar10" and method == "DDIM":
                 generated = diffusion.sample_ddim(model, (count, 3, 32, 32))
-            elif args.DDPM and cfg["datos"]["nombre"] == "cifar10":
+            elif method == "DDPM" and cfg["datos"]["nombre"] == "cifar10":
                 generated = diffusion.sample(model, (count, 3, 32, 32))
-            elif cfg["datos"]["nombre"] == "mnist":
-                print("MNIST is not supported for IS/FID evaluation; skipping generation")
             else:
                 raise ValueError(f"Unsupported dataset for IS/FID evaluation: {cfg['datos']['nombre']}")
             logits = _inception_batch(inception, a_rgb(generated, mean, std).to(device))
@@ -201,7 +197,27 @@ def main() -> int:
     generated_logits_tensor = torch.cat(generated_logits)
     inception_mean, inception_std = _inception_score(generated_logits_tensor)
     print(f"IS: {inception_mean:.4f} +/- {inception_std:.4f}")
-    print(f"FID: {_fid(real_features_tensor, generated_features_tensor):.4f}")
+    fid = _fid(real_features_tensor, generated_features_tensor)
+    print(f"FID: {fid:.4f}")
+    return {"IS": inception_mean, "IS/std": inception_std, "FID": fid}
+
+
+def main() -> int:
+    """Evaluate generated images against the local CIFAR-10 test set."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--num-samples", type=int, default=10000)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
+    parser.add_argument("--seed", type=int, default=42)
+    inference = parser.add_mutually_exclusive_group(required=True)
+    inference.add_argument("--DDPM", action="store_true")
+    inference.add_argument("--DDIM", action="store_true")
+    args = parser.parse_args()
+    evaluar(
+        args.checkpoint, args.num_samples, args.batch_size,
+        args.device, args.seed, "DDIM" if args.DDIM else "DDPM",
+    )
     return 0
 
 

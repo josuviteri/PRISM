@@ -41,6 +41,13 @@ entrenamiento:
   muestras_n: 64
   directorio_muestras: samples
 
+metricas:
+  checkpoint: checkpoints/cifar10_ddpm_v0.3.pt
+  num_samples: 2000
+  batch_size: 128
+  dispositivo: auto
+  metodo: DDIM
+
 wandb:
   proyecto: PRISM
   entidad: Viteritarrak

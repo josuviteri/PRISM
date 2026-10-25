@@ -103,34 +103,17 @@ python run.py --config configs/mnist.yaml
 # Improved LeNet CNN for MNIST dataset IS and FID metric evaluations.
 python run.py --config configs/mnist_evaluator.yaml
 
-# Web App from trained weights.
-python -m src.app.serve --checkpoint checkpoints/mejor.pt
-# Equivalently, start the explorer through the project entry point.
+# Start the web app through the project entry point.
 python run.py --serve
-
-# Generate images from gaussian noise using EMA weights.
-python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
-	--output-dir generated --num-samples 64 --DDPM 
-    # use --DDPM or --DDIM depending on desired reversing technique
-
-# DDIM permits a shorter or longer (up to the training schedule) reverse process.
-python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
-    --output-dir generated_ddim_20 --num-samples 64 --DDIM --denoising-steps 20
-
-# Evaluate FID and IS against the full CIFAR-10 test set or a subset (default: 10k samples).
-python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/model.pt \
-    --batch-size 256 --num-samples 2000 --DDPM 
-    # use --DDPM or --DDIM depending on desired reversing technique
-
-# Evaluate FID and IS against the full MNIST test set or a subset (default: 10k samples).
-python scripts/evaluate_diffusion_mnist.py --checkpoint checkpoints/model.pt  \
-    --batch-size 256 --num-samples 2000 \
-    --evaluator-checkpoint checkpoints/mnist_evaluator_v0.1.pt --DDPM
-    # use --DDPM or --DDIM depending on desired reversing technique
 
 # Calculate metrics and log FID/IS to W&B. Paths and sampling options live in the config.
 python run.py --solo-metricas --config configs/cifar10.yaml
 python run.py --solo-metricas --config configs/mnist.yaml
+
+# Generate images from gaussian noise using EMA weights.
+python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
+	--output-dir generated --num-samples 64 --DDPM 
+    # use --DDPM or --DDIM + --denoising-steps --num-samples depending on desired reversing technique out of the web UI
 ```
 
 MNIST expects four uncompressed IDX files at `data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`, `t10k-images.idx3-ubyte` and `t10k-labels.idx1-ubyte`. Images are maintained in `28x28` with a single channel; normalization is calculated only with the train split.

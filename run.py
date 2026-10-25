@@ -31,6 +31,8 @@ from scripts import evaluate_diffusion_mnist, evaluate_diffusion_cifar10  # noqa
 # mnist evaluator
 from src.training import mnist_evaluator_loop  # noqa: E402
 
+from src.app import serve  # noqa: E402
+
 def cargar_config(ruta: Path) -> dict:
     with open(ruta, encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -41,18 +43,26 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", type=Path, default=Path("configs/default.yaml"),
                     help="fichero de configuracion")
-    ap.add_argument("--smoke", action="store_true",
-                    help="usa configs/smoke.yaml: el pipeline entero en miniatura")
-    ap.add_argument("--solo-evaluar", action="store_true",
-                    help="carga el checkpoint y evalua, sin entrenar")
-    ap.add_argument("--solo-metricas", action="store_true",
-                        help="solo se evaluan las métricas FID y IS, sin entrenar")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--smoke", action="store_true",
+                      help="pipeline entero en miniatura")
+    mode.add_argument("--solo-evaluar", action="store_true",
+                      help = "carga el checkpoint y evalua respecto a la loss function (soft metrics), sin entrenar")
+    mode.add_argument("--solo-metricas", action="store_true",
+                      help = "carga el checkpoint y evalua respecto a FID e IS (hard metrics), sin entrenar")
+    mode.add_argument("--serve", action="store_true",
+                      help="lanza la interfaz web de exploracion de checkpoints")
+    
     args = ap.parse_args()
+
+    if args.serve:
+        return serve.main([])
 
     ruta = Path("configs/smoke.yaml") if args.smoke else args.config
     if not ruta.is_file():
         print(f"error: no existe {ruta}", file=sys.stderr)
         return 2
+    
     cfg = cargar_config(ruta)
 
     # 1 · reproducibilidad, antes que nada

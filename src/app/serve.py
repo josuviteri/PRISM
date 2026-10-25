@@ -1,7 +1,7 @@
 """Run a local web interface for exploring downloaded PRISM diffusion checkpoints.
 
 Example:
-    python -m src.app.serve --checkpoint-dir checkpoints
+    python -m src.app.serve
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Sequence
 
 import torch
 
@@ -111,14 +111,14 @@ def _data_url(image) -> str:
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Start the local PRISM diffusion explorer."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints"))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.device == "cuda" and not torch.cuda.is_available():
         parser.error("CUDA was requested but is not available")
     checkpoints = discover_checkpoints(args.checkpoint_dir)

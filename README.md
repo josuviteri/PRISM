@@ -105,6 +105,8 @@ python run.py --config configs/mnist_evaluator.yaml
 
 # Web App from trained weights.
 python -m src.app.serve --checkpoint checkpoints/mejor.pt
+# Equivalently, start the explorer through the project entry point.
+python run.py --serve
 
 # Generate images from gaussian noise using EMA weights.
 python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \

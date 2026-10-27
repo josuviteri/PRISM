@@ -11,3 +11,4 @@ tqdm==4.67.1
 py7zr==0.22.0
 matplotlib==3.9.3
 pytest==8.3.4
+gdown==6.4.2

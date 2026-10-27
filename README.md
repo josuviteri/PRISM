@@ -7,6 +7,11 @@ _Research project based on DDPM, DDIM and CFG papers._
 
 PRISM is a research initiative aimed at understanding unconditional and guided diffusion models for image generation. The project replicates three foundational papers: DDPM for the core denoising framework, DDIM for faster deterministic sampling, and classifier-free guidance (CFG) for conditional control. The replication is done on MNIST and CIFAR-10, following professional research practices: planning and tracking work in the open, fixed seeds and pinned dependencies for reproducibility, experiment tracking, and an honest comparison against the published results.
 
+The conditional configurations use the dataset class label as the U-Net conditioning. During
+training, `entrenamiento.p_uncond` randomly replaces a label with the reserved null class, so
+the same model learns both conditional and unconditional predictions. During sampling,
+`entrenamiento.guidance_scale` combines those predictions; a value of `1` disables guidance.
+
 The developed models will be exposed in a web app that showcases the generation process: the initial full-noise state, the final denoised image, and the intermediate states in between. This makes it possible to see how the reverse-diffusion process gradually turns noise into structure, and to compare DDPM and DDIM sampling side by side.
 
 Because the training hardware and budget are private and limited, training time has been cut relative to the original papers. As a result, absolute quality metrics (FID, IS) are expected to fall short of the published figures. Every deviation from the papers is documented in the sections below, along with its likely consequences, so that results can be interpreted fairly rather than compared naively.
@@ -36,11 +41,19 @@ NA
 
 ## Results
 
-| Métrica | Paper | Nuestra réplica | Escala |
-|---|---|---|---|
-| FID | 3.17 | NA | <Complete CIFAR-10 Test Set> |
-| IS | 9.46 | NA | <Complete CIFAR-10 Test Set> |
-| Not FID nor IS (Inceptionv3 was trained on IMAGENET) | NA | NA | <Complete CIFAR-10 Test Set> |
+| Best Model ID | Denoising Method | Dataset | FID (lower is better) | IS (higher is better) | 
+|---|---|---|---|---|
+| Original DDPM | DDPM |Complete CIFAR-10 Test Set | 3.17 | 9.46 |
+| mnist_ddpm_v0.2 | DDPM | Complete MNIST Test Set | NA | NA |
+| mnist_ddpm_v0.2 | DDIM | Complete MNIST Test Set | NA | NA |
+| mnist_ddpm_v0.2 | DDIM | 2k sample subset from MNIST Test Set | 31.93 | 2.13 |
+| cifar_ddpm_v0.3 | DDPM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
+| guided_mnist_ddpm_v0.1 | DDIM | Complete MNIST Test Set | NA | NA |
+| guided_mnist_ddpm_v0.1 | DDPM | Complete MNIST Test Set | NA | NA |
+| guided_cifar_ddpm_v0.1 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
+| guided_cifar_ddpm_v0.1 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
 
 <Honest explanation of the results, deviations, ...>
 
@@ -100,6 +113,12 @@ python run.py --config configs/cifar10.yaml
 # Unconditional DDPM training over local MNIST IDX.
 python run.py --config configs/mnist.yaml
 
+# Class-conditional DDPM + classifier-free guidance (CIFAR-10).
+python run.py --config configs/guided_cifar10.yaml
+
+# Class-conditional DDPM + classifier-free guidance (MNIST).
+python run.py --config configs/guided_mnist.yaml
+
 # Improved LeNet CNN for MNIST dataset IS and FID metric evaluations.
 python run.py --config configs/mnist_evaluator.yaml
 
@@ -125,7 +144,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 
 - Seed at `src/utils/seed.py`, value at `configs/`.
 - Dependencies with exact versions at `requirements.txt`.
-- Compute budget: **1.13h (Uncond DDPM MNIST) and 2.19h (Uncond DDPM CIFAR10) on NVIDIA RTX 5070 12 GB**.
+- Compute budget: **NVIDIA RTX 5070 12 GB**.
 - What the paper stated but was cut and its consequences: <explanation>.
 
 ### Tests

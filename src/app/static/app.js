@@ -3,6 +3,8 @@ const methods = [...document.querySelectorAll('input[name="method"]')];
 const steps = document.querySelector('#steps');
 const samples = document.querySelector('#samples');
 const seed = document.querySelector('#seed');
+const label = document.querySelector('#label');
+const guidanceScale = document.querySelector('#guidance-scale');
 const status = document.querySelector('#status');
 const generate = document.querySelector('#generate');
 let models = [];
@@ -28,6 +30,15 @@ function updateControls() {
   const ddim = selectedMethod() === 'ddim';
   document.querySelector('#model-type').textContent = model.dataset.toUpperCase();
   document.querySelector('#model-details').textContent = `${model.dataset.toUpperCase()} · trained with ${model.timesteps.toLocaleString()} diffusion steps`;
+  const conditioning = document.querySelector('#conditioning-fields');
+  conditioning.hidden = !model.conditional;
+  if (model.conditional) {
+    label.replaceChildren(...model.labels.map(item => new Option(`${item.value} · ${item.name}`, item.value)));
+    guidanceScale.value = model.guidance_scale ?? 1;
+    document.querySelector('#conditioning-details').textContent = `${model.num_classes} available classes · p_uncond ${model.p_uncond ?? 'not recorded'}`;
+  } else {
+    label.replaceChildren();
+  }
   steps.max = model.timesteps;
   if (+steps.value > model.timesteps) steps.value = model.timesteps;
   steps.disabled = !ddim;
@@ -82,7 +93,11 @@ document.querySelector('#form').addEventListener('submit', async event => {
   try {
     const response = await fetch('/api/generate', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({checkpoint: checkpoint.value, method, steps: +steps.value, samples: +samples.value, seed: +seed.value}),
+      body: JSON.stringify({
+        checkpoint: checkpoint.value, method, steps: +steps.value, samples: +samples.value, seed: +seed.value,
+        label: selectedModel().conditional ? +label.value : null,
+        guidance_scale: selectedModel().conditional ? +guidanceScale.value : null,
+      }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Sampling failed.');
@@ -92,7 +107,8 @@ document.querySelector('#form').addEventListener('submit', async event => {
     prepareDownload(document.querySelector('#download-output'), data.samples);
     document.querySelector('#empty').hidden = true;
     document.querySelector('#results').hidden = false;
-    document.querySelector('#run-summary').textContent = `${data.dataset.toUpperCase()} · ${data.method.toUpperCase()} · ${data.steps.toLocaleString()} steps · seed ${data.seed}`;
+    const classSummary = data.label === null ? '' : ` · class ${data.label} · CFG ${data.guidance_scale}`;
+    document.querySelector('#run-summary').textContent = `${data.dataset.toUpperCase()} · ${data.method.toUpperCase()} · ${data.steps.toLocaleString()} steps${classSummary} · seed ${data.seed}`;
     trajectory = data.trajectory;
     const slider = document.querySelector('#trajectory-slider');
     slider.max = Math.max(trajectory.length - 1, 0);

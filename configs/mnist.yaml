@@ -22,6 +22,7 @@ modelo:
   residual_blocks: 2
   attention_resolutions: [14, 7]
   dropout: 0.1
+  num_classes: 10
   diffusion_steps: 1000
   beta_start: 0.0001
   beta_end: 0.02
@@ -42,6 +43,8 @@ entrenamiento:
   muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
   muestras_n: 64
   directorio_muestras: samples
+  p_uncond: 0.0
+  guidance_scale: 0.0
 
 metricas:
   checkpoint: checkpoints/mnist_ddpm_v0.2.pt

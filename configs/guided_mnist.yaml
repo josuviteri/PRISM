@@ -1,0 +1,60 @@
+# Configuracion del entrenamiento DDPM incondicional sobre MNIST local.
+
+experimento:
+  nombre: guided_mnist_ddpm_v0.1
+  seed: 42
+
+datos:
+  nombre: mnist
+  ruta: data/data/mnist
+  val_frac: 0.1
+  seed: 42
+  subset: null
+  batch_size: 128
+  num_workers: 4
+  pin_memory: true
+  augment: false
+
+modelo:
+  nombre: guided_ddpm_mnist
+  base_channels: 64
+  channel_multipliers: [1, 2, 4]
+  residual_blocks: 2
+  attention_resolutions: [14, 7]
+  dropout: 0.1
+  num_classes: 10
+  diffusion_steps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  ema_decay: 0.9995
+  ema_warmup: true
+
+entrenamiento:
+  learning_rate: 0.0002
+  warmup_steps: 1000
+  epochs: 200
+  optimizador: adam
+  grad_clip: 1.0
+  horizontal_flip: false
+  compile: true
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
+  reanudar: false              # true = continuar desde checkpoints/<nombre>.pt + .resume.pt si existen
+  muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
+  muestras_n: 64
+  directorio_muestras: samples
+  p_uncond: 0.1
+  guidance_scale: 3.0
+
+metricas:
+  checkpoint: checkpoints/guided_mnist_ddpm_v0.1.pt
+  evaluator_checkpoint: checkpoints/mnist_evaluator_v0.1.pt
+  num_samples: 2000
+  batch_size: 128
+  dispositivo: auto
+  metodo: DDIM
+
+wandb:
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: online

@@ -62,17 +62,21 @@ class AttentionBlock(nn.Module):
 
 
 class UNet(nn.Module):
-  """Unconditional U-Net"""
+  """U-Net with optional class conditioning for classifier-free guidance."""
 
   def __init__(self, *, in_ch: int = 3, ch: int, out_ch: int,
                ch_mult: Sequence[int] = (1, 2, 4, 8), num_res_blocks: int,
                attn_resolutions: Sequence[int], dropout: float = 0.,
-               resamp_with_conv: bool = True):
+               resamp_with_conv: bool = True, num_classes: int = 1):
     super().__init__()
+    if num_classes < 1:
+      raise ValueError('num_classes must be positive')
+    self.num_classes = num_classes
     self.ch_mult = tuple(ch_mult)
     self.attn_resolutions = set(attn_resolutions)
     temb_ch = ch * 4
     self.temb = nn.Sequential(nn.Linear(ch, temb_ch), nn.SiLU(), nn.Linear(temb_ch, temb_ch))
+    self.class_embedding = nn.Embedding(num_classes + 1, temb_ch) if num_classes > 1 else None
     self.conv_in = nn.Conv2d(in_ch, ch, 3, padding=1)
     self.down = nn.ModuleList()
     skip_channels = [ch]
@@ -124,10 +128,20 @@ class UNet(nn.Module):
     return F.pad(embedding, (0, channels - embedding.shape[1]))
 
   def forward(self, x: Tensor, t: Tensor, y: Optional[Tensor] = None) -> Tensor:
-    del y
     if x.ndim != 4 or t.ndim != 1 or x.shape[0] != t.shape[0]:
       raise ValueError('expected x with shape (B, C, H, W) and t with shape (B,)')
     temb = self.temb(self.timestep_embedding(t, self.conv_in.out_channels))
+    if self.class_embedding is not None:
+      null_label = self.num_classes
+      if y is None:
+        y = torch.full((x.shape[0],), null_label, device=x.device, dtype=torch.long)
+      elif y.ndim != 1 or y.shape[0] != x.shape[0]:
+        raise ValueError('expected y with shape (B,)')
+      elif y.dtype != torch.long:
+        raise ValueError('class labels must have dtype torch.long')
+      if torch.any((y < 0) | (y > null_label)):
+        raise ValueError(f'class labels must be in [0, {null_label}]')
+      temb = temb + self.class_embedding(y)
     h = self.conv_in(x)
     hs = [h]
     for level, stage in enumerate(self.down):
@@ -156,9 +170,8 @@ class UNet(nn.Module):
 def model(*, in_ch: int = 3, ch: int, out_ch: int, ch_mult=(1, 2, 4, 8),
           num_res_blocks: int, attn_resolutions, dropout: float = 0.,
           resamp_with_conv: bool = True, num_classes: int = 1, **kwargs) -> UNet:
-  if num_classes != 1:
-    raise ValueError('only unconditional models are supported')
   del kwargs
   return UNet(in_ch=in_ch, ch=ch, out_ch=out_ch, ch_mult=ch_mult,
               num_res_blocks=num_res_blocks, attn_resolutions=attn_resolutions,
-              dropout=dropout, resamp_with_conv=resamp_with_conv)
+              dropout=dropout, resamp_with_conv=resamp_with_conv,
+              num_classes=num_classes)

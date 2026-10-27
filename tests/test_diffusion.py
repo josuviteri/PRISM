@@ -15,6 +15,17 @@ class ZeroDenoiser(nn.Module):
         return torch.zeros_like(x)
 
 
+class LabelDenoiser(nn.Module):
+    num_classes = 3
+
+    def forward(
+        self, x: torch.Tensor, timesteps: torch.Tensor, labels: torch.Tensor
+    ) -> torch.Tensor:
+        del timesteps
+        values = labels.to(x.dtype).view(-1, 1, 1, 1)
+        return values.expand_as(x)
+
+
 def test_forward_diffusion_matches_schedule_equation():
     diffusion = GaussianDiffusion(4, 0.01, 0.04, torch.device("cpu"))
     clean = torch.ones(2, 1, 3, 3)
@@ -41,6 +52,18 @@ def test_ddim_sampling_validates_step_count():
     diffusion = GaussianDiffusion(3, 0.01, 0.03, torch.device("cpu"))
     with pytest.raises(ValueError, match="sampling_steps"):
         diffusion.sample_ddim(ZeroDenoiser(), (1, 1, 4, 4), sampling_steps=4)
+
+
+def test_cfg_combines_conditional_and_unconditional_predictions():
+    diffusion = GaussianDiffusion(1, 0.01, 0.01, torch.device("cpu"))
+    denoiser = LabelDenoiser()
+    labels = torch.tensor([1, 2])
+    prediction = diffusion._predict_noise(
+        denoiser, torch.zeros(2, 1, 2, 2), torch.zeros(2, dtype=torch.long),
+        labels, guidance_scale=2.0,
+    )
+    expected = torch.tensor([-1.0, 1.0]).view(2, 1, 1, 1).expand(2, 1, 2, 2)
+    assert torch.equal(prediction, expected)
 
 
 def test_ema_tracks_parameters_and_copies_buffers():

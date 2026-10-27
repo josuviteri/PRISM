@@ -1,0 +1,57 @@
+# Todos los hiperparametros viven aqui. Ninguno escrito a fuego en el codigo:
+# es lo que permite reproducir un experimento sabiendo solo que config se uso.
+
+experimento:
+  nombre: guided_cifar10_ddpm_v0.1
+  seed: 42
+
+datos:
+  nombre: cifar10
+  ruta: data/data/cifar-10
+  subset: null          # null = dataset completo; un entero = N muestras (regla 5/20)
+  batch_size: 128
+  num_workers: 4
+  pin_memory: true
+
+modelo:
+  nombre: guided_ddpm_cifar
+  base_channels: 128
+  channel_multipliers: [1, 2, 2, 2]
+  residual_blocks: 2
+  attention_resolutions: [16]
+  dropout: 0.1
+  num_classes: 10
+  diffusion_steps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  ema_decay: 0.9995 # con warmup (ema_warmup): decay efectivo = min(ema_decay, (1+n)/(10+n)). 0.9999 solo tiene sentido en runs de >200k pasos
+  ema_warmup: true
+
+entrenamiento:
+  learning_rate: 0.0002
+  warmup_steps: 1000
+  epochs: 130 # steps = train size / batch size * epochs | train = 45k (val_frac 0.1 de 50k) -> 351 pasos/epoca -> 130 epocas = ~45.6k pasos
+  optimizador: adam
+  grad_clip: 1.0
+  horizontal_flip: true # es util con cifar10, pero desactivar con MNIST
+  compile: true
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
+  reanudar: false              # true = continuar desde checkpoints/<nombre>.pt + .resume.pt si existen
+  muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
+  muestras_n: 64
+  directorio_muestras: samples
+  p_uncond: 0.1
+  guidance_scale: 3.0
+
+metricas:
+  checkpoint: checkpoints/guided_cifar10_ddpm_v0.1.pt
+  num_samples: 2000
+  batch_size: 128
+  dispositivo: auto
+  metodo: DDIM
+
+wandb:
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: online

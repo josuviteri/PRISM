@@ -32,19 +32,19 @@ modelo:
 entrenamiento:
   learning_rate: 0.0002
   warmup_steps: 1000
-  epochs: 110
+  epochs: 200
   optimizador: adam
   grad_clip: 1.0
   horizontal_flip: false
   compile: true
   dispositivo: auto
   directorio_checkpoints: checkpoints
-  p_uncond: 0.0
-  guidance_scale: 0.0
   reanudar: false              # true = continuar desde checkpoints/<nombre>.pt + .resume.pt si existen
   muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
   muestras_n: 64
   directorio_muestras: samples
+  p_uncond: 0.1
+  guidance_scale: 3.0
 
 metricas:
   checkpoint: checkpoints/guided_mnist_ddpm_v0.1.pt

@@ -22,6 +22,7 @@ modelo:
   residual_blocks: 2
   attention_resolutions: [14, 7]
   dropout: 0.1
+  num_classes: 10
   diffusion_steps: 1000
   beta_start: 0.0001
   beta_end: 0.02
@@ -38,6 +39,8 @@ entrenamiento:
   compile: true
   dispositivo: auto
   directorio_checkpoints: checkpoints
+  p_uncond: 0.0
+  guidance_scale: 0.0
   reanudar: false              # true = continuar desde checkpoints/<nombre>.pt + .resume.pt si existen
   muestras_cada_epocas: 10     # rejilla de muestras EMA (0 = desactivado); cada una cuesta ~1 min de GPU
   muestras_n: 64

@@ -55,6 +55,7 @@ def _build_model(config: dict[str, Any]) -> nn.Module:
         num_res_blocks=model_config["residual_blocks"],
         attn_resolutions=tuple(model_config["attention_resolutions"]),
         dropout=model_config["dropout"],
+        num_classes=model_config.get("num_classes", 1),
     )
 
 

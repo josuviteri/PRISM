@@ -61,16 +61,65 @@ class GaussianDiffusion:
         denoiser: nn.Module,
         x_start: Tensor,
         generator: torch.Generator | None = None,
+        labels: Tensor | None = None,
+        p_uncond: float = 0.0,
     ) -> Tensor:
-        """Epsilon-prediction MSE. Pass a generator for reproducible (t, noise) draws."""
+        """Epsilon-prediction MSE with optional classifier-free label dropout."""
+        if not 0.0 <= p_uncond <= 1.0:
+            raise ValueError("p_uncond must be between 0 and 1")
         device = x_start.device
         timesteps = torch.randint(
             0, self.timesteps, (x_start.shape[0],), device=device, generator=generator)
         noise = torch.randn(x_start.shape, device=device, dtype=x_start.dtype, generator=generator)
         noisy = self.q_sample(x_start, timesteps, noise)
+        if labels is not None:
+            labels = labels.to(device=device, dtype=torch.long)
+            if labels.ndim != 1 or labels.shape[0] != x_start.shape[0]:
+                raise ValueError("labels must have shape (B,)")
+            num_classes = getattr(denoiser, "num_classes", 1)
+            if num_classes <= 1:
+                raise ValueError("labels require a class-conditional denoiser")
+            if torch.any((labels < 0) | (labels >= num_classes)):
+                raise ValueError(f"labels must be in [0, {num_classes - 1}]")
+            if p_uncond:
+                drop = torch.rand(labels.shape, device=device, generator=generator) < p_uncond
+                labels = labels.masked_fill(drop, num_classes)
         with torch.autocast("cuda", dtype=torch.bfloat16, enabled=device.type == "cuda"):
-            prediction = denoiser(noisy, timesteps)
+            prediction = (
+                denoiser(noisy, timesteps, labels)
+                if labels is not None
+                else denoiser(noisy, timesteps)
+            )
         return torch.nn.functional.mse_loss(prediction.float(), noise)
+
+    @staticmethod
+    def _predict_noise(
+        denoiser: nn.Module,
+        sample: Tensor,
+        timesteps: Tensor,
+        labels: Tensor | None,
+        guidance_scale: float,
+    ) -> Tensor:
+        if labels is None:
+            if guidance_scale != 1.0:
+                raise ValueError("guidance_scale requires class labels")
+            return denoiser(sample, timesteps)
+        num_classes = getattr(denoiser, "num_classes", 1)
+        if num_classes <= 1:
+            raise ValueError("labels require a class-conditional denoiser")
+        labels = labels.to(device=sample.device, dtype=torch.long)
+        if labels.ndim != 1 or labels.shape[0] != sample.shape[0]:
+            raise ValueError("labels must have shape (B,)")
+        if torch.any((labels < 0) | (labels >= num_classes)):
+            raise ValueError(f"labels must be in [0, {num_classes - 1}]")
+        conditional = denoiser(sample, timesteps, labels)
+        if guidance_scale == 1.0:
+            return conditional
+        unconditional = denoiser(
+            sample, timesteps,
+            torch.full_like(labels, num_classes),
+        )
+        return unconditional + guidance_scale * (conditional - unconditional)
 
     @torch.no_grad()
     def sample(
@@ -79,6 +128,8 @@ class GaussianDiffusion:
         shape: tuple[int, ...],
         generator: torch.Generator | None = None,
         amp: bool = True,
+        labels: Tensor | None = None,
+        guidance_scale: float = 1.0,
     ) -> Tensor:
         """Ancestral sampling with x0 clipping at every step, as in the reference DDPM code."""
         device = self.betas.device
@@ -89,7 +140,8 @@ class GaussianDiffusion:
         for step in reversed(range(self.timesteps)):
             timesteps = torch.full((shape[0],), step, device=device, dtype=torch.long)
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=use_amp):
-                predicted_noise = denoiser(sample, timesteps)
+                predicted_noise = self._predict_noise(
+                    denoiser, sample, timesteps, labels, guidance_scale)
             predicted_noise = predicted_noise.float()
             x0 = (self.sqrt_recip_alpha_bars[step] * sample
                   - self.sqrt_recipm1_alpha_bars[step] * predicted_noise).clamp(-1.0, 1.0)
@@ -111,6 +163,8 @@ class GaussianDiffusion:
         sampling_steps: int = 50,
         generator: torch.Generator | None = None,
         amp: bool = True,
+        labels: Tensor | None = None,
+        guidance_scale: float = 1.0,
     ) -> Tensor:
         """Deterministic DDIM sampling on a subsampled training schedule."""
         if not 1 <= sampling_steps <= self.timesteps:
@@ -127,7 +181,8 @@ class GaussianDiffusion:
             step = schedule[position]
             timesteps = torch.full((shape[0],), step, device=device, dtype=torch.long)
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=use_amp):
-                predicted_noise = denoiser(sample, timesteps)
+                predicted_noise = self._predict_noise(
+                    denoiser, sample, timesteps, labels, guidance_scale)
             predicted_noise = predicted_noise.float()
             x0 = (
                 self.sqrt_recip_alpha_bars[step] * sample
@@ -194,6 +249,7 @@ def construir_modelo(cfg: dict[str, Any]) -> nn.Module:
         num_res_blocks=model_cfg["residual_blocks"],
         attn_resolutions=tuple(model_cfg["attention_resolutions"]),
         dropout=model_cfg["dropout"],
+        num_classes=model_cfg.get("num_classes", 1),
     )
 
 
@@ -335,6 +391,8 @@ def _epoch(
     ema: ExponentialMovingAverage | None,
     max_batches: int | None = None,
     horizontal_flip: bool = False,
+    p_uncond: float = 0.0,
+    num_classes: int = 1,
     check_every: int = 50,
 ) -> tuple[float, int, float]:
     """One training epoch with no per-step host syncs (finiteness is checked periodically)."""
@@ -352,12 +410,14 @@ def _epoch(
                 f"non-finite training loss or gradient norm within the first {batches} batches "
                 "of this epoch")
 
-    for images, _ in loader:
+    for images, labels in loader:
         images = images.to(device, non_blocking=True)
         if horizontal_flip:
             images = _apply_horizontal_flip(images)
         optimizer.zero_grad(set_to_none=True)
-        loss = diffusion.loss(model, images)
+        conditional_labels = labels if num_classes > 1 else None
+        loss = diffusion.loss(
+            model, images, labels=conditional_labels, p_uncond=p_uncond)
         loss.backward()
         # Returns the norm measured before clipping, so it is also the monitored value.
         gradient_norm = nn.utils.clip_grad_norm_(model.parameters(), max_norm)
@@ -399,9 +459,12 @@ def evaluar(
     generator.manual_seed(seed)
     total_loss = torch.zeros((), device=device)
     total_items = 0
-    for images, _ in loader:
+    for images, labels in loader:
         images = images.to(device, non_blocking=True)
-        total_loss += diffusion.loss(model, images, generator=generator) * images.shape[0]
+        conditional_labels = labels if getattr(model, "num_classes", 1) > 1 else None
+        total_loss += diffusion.loss(
+            model, images, generator=generator, labels=conditional_labels, p_uncond=0.0
+        ) * images.shape[0]
         total_items += images.shape[0]
     return {"val/loss": total_loss.item() / max(total_items, 1)}
 
@@ -477,6 +540,8 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             ema,
             remaining_steps,
             train_cfg.get("horizontal_flip", False),
+            train_cfg.get("p_uncond", 0.0),
+            model_cfg.get("num_classes", 1),
         )
         elapsed = time.perf_counter() - started
         global_step += batches
@@ -509,8 +574,15 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             generator = torch.Generator(device=device)
             generator.manual_seed(0 if seed is None else seed)
             image_shape = tuple(val_loader.dataset[0][0].shape)
+            num_classes = model_cfg.get("num_classes", 1)
+            sample_labels = (
+                torch.arange(sample_count, device=device, dtype=torch.long) % num_classes
+                if num_classes > 1 else None
+            )
             samples = diffusion.sample(
-                ema.module, (sample_count, *image_shape), generator=generator)
+                ema.module, (sample_count, *image_shape), generator=generator,
+                labels=sample_labels,
+                guidance_scale=float(train_cfg.get("guidance_scale", 1.0)))
             grid_path = sample_dir / f"epoch_{epoch + 1:04d}.png"
             _save_image_grid(samples, grid_path)
             _log_image(run, grid_path, global_step)

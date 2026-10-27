@@ -44,12 +44,16 @@ NA
 | Best Model ID | Denoising Method | Dataset | FID (lower is better) | IS (higher is better) | 
 |---|---|---|---|---|
 | Original DDPM | DDPM |Complete CIFAR-10 Test Set | 3.17 | 9.46 |
-| cifar_ddpm_v0.3 | DDPM | Complete CIFAR-10 Test Set | NA | NA |
-| cifar_ddpm_v0.3 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
-| cifar_ddpm_v0.3 | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
 | mnist_ddpm_v0.2 | DDPM | Complete MNIST Test Set | NA | NA |
 | mnist_ddpm_v0.2 | DDIM | Complete MNIST Test Set | NA | NA |
 | mnist_ddpm_v0.2 | DDIM | 2k sample subset from MNIST Test Set | 31.93 | 2.13 |
+| cifar_ddpm_v0.3 | DDPM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
+| guided_mnist_ddpm_v0.1 | DDIM | Complete MNIST Test Set | NA | NA |
+| guided_mnist_ddpm_v0.1 | DDPM | Complete MNIST Test Set | NA | NA |
+| guided_cifar_ddpm_v0.1 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
+| guided_cifar_ddpm_v0.1 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
 
 <Honest explanation of the results, deviations, ...>
 

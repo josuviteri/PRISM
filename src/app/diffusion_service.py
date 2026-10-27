@@ -23,6 +23,9 @@ class CheckpointInfo:
     path: Path
     dataset: str
     timesteps: int
+    num_classes: int
+    p_uncond: float | None
+    guidance_scale: float | None
 
 
 def discover_checkpoints(directory: Path) -> dict[str, CheckpointInfo]:
@@ -36,11 +39,19 @@ def discover_checkpoints(directory: Path) -> dict[str, CheckpointInfo]:
                 raise ValueError("missing EMA weights")
             dataset = config["datos"]["nombre"]
             timesteps = int(config["modelo"]["diffusion_steps"])
+            num_classes = int(config["modelo"].get("num_classes", 1))
             if dataset not in {"mnist", "cifar10"}:
                 raise ValueError(f"unsupported dataset: {dataset}")
+            if num_classes < 1:
+                raise ValueError("num_classes must be positive")
         except (KeyError, TypeError, ValueError, RuntimeError):
             continue
-        checkpoints[path.name] = CheckpointInfo(path.name, path, dataset, timesteps)
+        training = config.get("entrenamiento", {})
+        checkpoints[path.name] = CheckpointInfo(
+            path.name, path, dataset, timesteps, num_classes,
+            float(training["p_uncond"]) if "p_uncond" in training else None,
+            float(training["guidance_scale"]) if "guidance_scale" in training else None,
+        )
     return checkpoints
 
 
@@ -90,6 +101,8 @@ class DiffusionExplorer:
         sampling_steps: int | None,
         num_samples: int,
         seed: int,
+        label: int | None = None,
+        guidance_scale: float | None = None,
     ) -> tuple[Image.Image, Image.Image, list[tuple[int, int, Image.Image]], CheckpointInfo, int]:
         """Generate image grids and an inspectable reverse-diffusion trajectory."""
         if identifier not in self.checkpoints:
@@ -99,6 +112,15 @@ class DiffusionExplorer:
         if not 1 <= num_samples <= 64:
             raise ValueError("number of samples must be between 1 and 64")
         info = self.checkpoints[identifier]
+        if info.num_classes > 1:
+            if label is None or not 0 <= label < info.num_classes:
+                raise ValueError(f"label must be between 0 and {info.num_classes - 1}")
+            if guidance_scale is None:
+                guidance_scale = info.guidance_scale if info.guidance_scale is not None else 1.0
+            if not math.isfinite(guidance_scale) or not 0.0 <= guidance_scale <= 20.0:
+                raise ValueError("guidance scale must be between 0 and 20")
+        elif label is not None or guidance_scale not in (None, 1.0):
+            raise ValueError("class labels and guidance require a conditional checkpoint")
         if method == "ddpm":
             steps = info.timesteps
         else:
@@ -115,8 +137,12 @@ class DiffusionExplorer:
             model_config["beta_end"],
             self.device,
         )
+        labels = None if label is None else torch.full(
+            (num_samples,), label, device=self.device, dtype=torch.long
+        )
         noise, samples, trajectory = sampler.sample_with_trajectory(
-            model, (num_samples, channels, size, size), method, steps, generator
+            model, (num_samples, channels, size, size), method, steps, generator,
+            labels=labels, guidance_scale=guidance_scale if guidance_scale is not None else 1.0,
         )
         frames = [(iteration, timestep, image_grid(images)) for iteration, timestep, images in trajectory]
         return image_grid(noise), image_grid(samples), frames, info, steps

@@ -48,7 +48,16 @@ class ExplorerHandler(BaseHTTPRequestHandler):
             self._static("app.js", "application/javascript; charset=utf-8")
         elif self.path == "/api/models":
             models = [
-                {"id": item.identifier, "dataset": item.dataset, "timesteps": item.timesteps}
+                {
+                    "id": item.identifier,
+                    "dataset": item.dataset,
+                    "timesteps": item.timesteps,
+                    "num_classes": item.num_classes,
+                    "conditional": item.num_classes > 1,
+                    "labels": _class_labels(item.dataset, item.num_classes),
+                    "p_uncond": item.p_uncond,
+                    "guidance_scale": item.guidance_scale,
+                }
                 for item in self.server.explorer.checkpoints.values()
             ]
             self._json(HTTPStatus.OK, models)
@@ -70,10 +79,13 @@ class ExplorerHandler(BaseHTTPRequestHandler):
                     int(payload["steps"]),
                     int(payload["samples"]),
                     int(payload["seed"]),
+                    int(payload["label"]) if payload.get("label") is not None else None,
+                    float(payload["guidance_scale"]) if payload.get("guidance_scale") is not None else None,
                 )
             self._json(HTTPStatus.OK, {
                 "noise": _data_url(noise), "samples": _data_url(samples), "dataset": info.dataset,
                 "method": payload["method"], "steps": used_steps, "seed": payload["seed"],
+                "label": payload.get("label"), "guidance_scale": payload.get("guidance_scale"),
                 "trajectory": [
                     {"iteration": iteration, "timestep": timestep, "image": _data_url(image)}
                     for iteration, timestep, image in frames
@@ -109,6 +121,16 @@ def _data_url(image) -> str:
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _class_labels(dataset: str, num_classes: int) -> list[dict[str, int | str]]:
+    """Return stable browser labels for a checkpoint's class indices."""
+    names = (
+        [str(index) for index in range(num_classes)]
+        if dataset == "mnist"
+        else ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+    )
+    return [{"value": index, "name": name} for index, name in enumerate(names[:num_classes])]
 
 
 def main(argv: Sequence[str] | None = None) -> int:

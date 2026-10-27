@@ -41,11 +41,15 @@ NA
 
 ## Results
 
-| Métrica | Paper | Nuestra réplica | Escala |
-|---|---|---|---|
-| FID | 3.17 | NA | <Complete CIFAR-10 Test Set> |
-| IS | 9.46 | NA | <Complete CIFAR-10 Test Set> |
-| Not FID nor IS (Inceptionv3 was trained on IMAGENET) | NA | NA | <Complete CIFAR-10 Test Set> |
+| Best Model ID | Denoising Method | Dataset | FID (lower is better) | IS (higher is better) | 
+|---|---|---|---|---|
+| Original DDPM | DDPM |Complete CIFAR-10 Test Set | 3.17 | 9.46 |
+| cifar_ddpm_v0.3 | DDPM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | DDIM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
+| mnist_ddpm_v0.2 | DDPM | Complete MNIST Test Set | NA | NA |
+| mnist_ddpm_v0.2 | DDIM | Complete MNIST Test Set | NA | NA |
+| mnist_ddpm_v0.2 | DDIM | 2k sample subset from MNIST Test Set | 31.93 | 2.13 |
 
 <Honest explanation of the results, deviations, ...>
 
@@ -136,7 +140,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 
 - Seed at `src/utils/seed.py`, value at `configs/`.
 - Dependencies with exact versions at `requirements.txt`.
-- Compute budget: **1.13h (Uncond DDPM MNIST) and 2.19h (Uncond DDPM CIFAR10) on NVIDIA RTX 5070 12 GB**.
+- Compute budget: **NVIDIA RTX 5070 12 GB**.
 - What the paper stated but was cut and its consequences: <explanation>.
 
 ### Tests

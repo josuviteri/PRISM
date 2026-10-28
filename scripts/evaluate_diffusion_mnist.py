@@ -144,9 +144,16 @@ def evaluar(
     if num_samples < len(loader.dataset):
         loader = _stratified_loader(loader, num_samples, seed)
     diffusion = construir_difusion(cfg, device)
+    sampling_steps = diffusion.timesteps
+    if method == "DDIM":
+        sampling_steps = int(cfg["modelo"].get("ddim_timesteps", min(50, diffusion.timesteps)))
+        if not 1 <= sampling_steps <= diffusion.timesteps:
+            raise ValueError(
+                "modelo.ddim_timesteps must be between 1 and modelo.diffusion_steps"
+            )
     print(
         f"checkpoint={checkpoint} device={device} "
-        f"diffusion_steps={diffusion.timesteps} samples={num_samples} "
+        f"sampling_steps={sampling_steps} samples={num_samples} "
         f"batch_size={batch_size} seed={seed} evaluator={evaluator_checkpoint}"
     )
 
@@ -177,7 +184,11 @@ def evaluar(
             if cfg["datos"]["nombre"] != "mnist":
                 raise ValueError(f"Unsupported dataset for IS/FID evaluation: {cfg['datos']['nombre']}")
             shape = (count, 1, 28, 28)
-            generated = diffusion.sample_ddim(model, shape) if method == "DDIM" else diffusion.sample(model, shape)
+            generated = (
+                diffusion.sample_ddim(model, shape, sampling_steps=sampling_steps)
+                if method == "DDIM"
+                else diffusion.sample(model, shape)
+            )
             evaluator_images = _normalizar_para_evaluador(
                 generated, source_mean, source_std, evaluator_mean, evaluator_std
             )

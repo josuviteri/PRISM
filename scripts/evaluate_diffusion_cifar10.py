@@ -143,10 +143,17 @@ def evaluar(
     if num_samples < len(loader.dataset):
         loader = _stratified_loader(loader, num_samples, seed)
     diffusion = construir_difusion(cfg, device)
+    sampling_steps = diffusion.timesteps
+    if method == "DDIM":
+        sampling_steps = int(cfg["modelo"].get("ddim_timesteps", min(50, diffusion.timesteps)))
+        if not 1 <= sampling_steps <= diffusion.timesteps:
+            raise ValueError(
+                "modelo.ddim_timesteps must be between 1 and modelo.diffusion_steps"
+            )
     inception, hook, captured_features = _load_inception(device)
     print(
         f"checkpoint={checkpoint} device={device} "
-        f"diffusion_steps={diffusion.timesteps} samples={num_samples} "
+        f"sampling_steps={sampling_steps} samples={num_samples} "
         f"batch_size={batch_size} seed={seed}"
     )
 
@@ -173,7 +180,9 @@ def evaluar(
             count = min(batch_size, num_samples - seen)
             batch_started = time.perf_counter()
             if cfg["datos"]["nombre"] == "cifar10" and method == "DDIM":
-                generated = diffusion.sample_ddim(model, (count, 3, 32, 32))
+                generated = diffusion.sample_ddim(
+                    model, (count, 3, 32, 32), sampling_steps=sampling_steps
+                )
             elif method == "DDPM" and cfg["datos"]["nombre"] == "cifar10":
                 generated = diffusion.sample(model, (count, 3, 32, 32))
             else:

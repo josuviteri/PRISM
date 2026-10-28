@@ -22,6 +22,7 @@ modelo:
   dropout: 0.1
   num_classes: 10
   diffusion_steps: 1000
+  ddim_timesteps: 50
   beta_start: 0.0001
   beta_end: 0.02
   ema_decay: 0.9995 # con warmup (ema_warmup): decay efectivo = min(ema_decay, (1+n)/(10+n)). 0.9999 solo tiene sentido en runs de >200k pasos
@@ -30,7 +31,7 @@ modelo:
 entrenamiento:
   learning_rate: 0.0002
   warmup_steps: 1000
-  epochs: 130 # steps = train size / batch size * epochs | train = 45k (val_frac 0.1 de 50k) -> 351 pasos/epoca -> 130 epocas = ~45.6k pasos
+  epochs: 150
   optimizador: adam
   grad_clip: 1.0
   horizontal_flip: true # es util con cifar10, pero desactivar con MNIST
@@ -46,8 +47,8 @@ entrenamiento:
 
 metricas:
   checkpoint: checkpoints/guided_cifar10_ddpm_v0.1.pt
-  num_samples: 2000
-  batch_size: 128
+  num_samples: 10000
+  batch_size: 512
   dispositivo: auto
   metodo: DDIM
 

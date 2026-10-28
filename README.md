@@ -41,19 +41,19 @@ NA
 
 ## Results
 
-| Best Model ID | Denoising Method | Dataset | FID (lower is better) | IS (higher is better) | 
-|---|---|---|---|---|
-| Original DDPM | DDPM |Complete CIFAR-10 Test Set | 3.17 | 9.46 |
-| mnist_ddpm_v0.2 | DDPM | Complete MNIST Test Set | NA | NA |
-| mnist_ddpm_v0.2 | DDIM | 2k sample subset from MNIST Test Set | 31.93 | 2.13 |
-| mnist_ddpm_v0.2 | DDIM | Complete MNIST Test Set | 31.34 | 2.14 |
-| cifar_ddpm_v0.3 | DDPM | Complete CIFAR-10 Test Set | NA | NA |
-| cifar_ddpm_v0.3 | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
-| cifar_ddpm_v0.3 | DDIM | Complete CIFAR-10 Test Set | 41.03 | 6.95 |
-| guided_mnist_ddpm_v0.1 | DDIM | Complete MNIST Test Set | 34.10 | 2.15 |
-| guided_mnist_ddpm_v0.1 | DDPM | Complete MNIST Test Set | NA | NA |
-| guided_cifar_ddpm_v0.1 | DDIM | Complete CIFAR-10 Test Set | 42.62 | 6.72 |
-| guided_cifar_ddpm_v0.1 | DDPM | Complete CIFAR-10 Test Set | NA | NA |
+| Best Model ID | Training Steps | Denoising Method | Dataset | FID (lower is better) | IS (higher is better) | 
+|---|---|---|---|---|---|
+| Original DDPM | 800k | DDPM |Complete CIFAR-10 Test Set | 3.17 | 9.46 |
+| mnist_ddpm_v0.2 | 38.6k | DDPM | Complete MNIST Test Set | NA | NA |
+| mnist_ddpm_v0.2 | 38.6k | DDIM | 2k sample subset from MNIST Test Set | 31.93 | 2.13 |
+| mnist_ddpm_v0.2 | 38.6k | DDIM | Complete MNIST Test Set | 31.34 | 2.14 |
+| cifar_ddpm_v0.3 | 45.7k | DDPM | Complete CIFAR-10 Test Set | NA | NA |
+| cifar_ddpm_v0.3 | 45.7k | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
+| cifar_ddpm_v0.3 | 45.7k | DDIM | Complete CIFAR-10 Test Set | 41.03 | 6.95 |
+| guided_mnist_ddpm_v0.1 | 70.3k | DDIM | Complete MNIST Test Set | 34.10 | 2.15 |
+| guided_mnist_ddpm_v0.1 | 70.3k | DDPM | Complete MNIST Test Set | NA | NA |
+| guided_cifar_ddpm_v0.1 | 52.7k | DDIM | Complete CIFAR-10 Test Set | 42.62 | 6.72 |
+| guided_cifar_ddpm_v0.1 | 52.7k | DDPM | Complete CIFAR-10 Test Set | NA | NA |
 
 Evaluating on the complete test set using the DDPM method takes much longer than doing it using DDIM, 
 but the results are much better. We will include them in the future if we have spare time.
@@ -146,7 +146,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 - Seed at `src/utils/seed.py`, value at `configs/`.
 - Dependencies with exact versions at `requirements.txt`.
 - Compute budget: **NVIDIA RTX 5070 12 GB**.
-- What the paper stated but was cut and its consequences: <explanation>.
+- What the paper stated but was cut and its consequences: We decide to cut the training steps and did not evaluate using DDPM for now due to computing time constraints (it could be done in next releases).
 
 ### Tests
 

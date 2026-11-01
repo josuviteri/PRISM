@@ -101,6 +101,11 @@ def main() -> int:
                 "device_name": str(metric_cfg.get("dispositivo", "auto")),
                 "seed": int(cfg["experimento"]["seed"]),
                 "method": method,
+                "usar_etiquetas": bool(metric_cfg.get("usar_etiquetas", True)),
+                "guidance_scale": (
+                    None if metric_cfg.get("guidance_scale") is None
+                    else float(metric_cfg["guidance_scale"])
+                ),
             }
             if dataset == "mnist":
                 metricas = evaluate_diffusion_mnist.evaluar(

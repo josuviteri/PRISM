@@ -22,7 +22,7 @@ modelo:
   residual_blocks: 2
   attention_resolutions: [14, 7]
   dropout: 0.1
-  num_classes: 10
+  num_classes: 1
   diffusion_steps: 1000
   ddim_timesteps: 50
   beta_start: 0.0001

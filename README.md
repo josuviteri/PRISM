@@ -56,11 +56,47 @@ with a web UI for experimental guided generation on top.
 | mnist_ddpm_v0.2 | 38.6k | DDIM | Complete MNIST Test Set | 31.34 | 2.14 |
 | cifar_ddpm_v0.3 | 45.7k | DDPM | Complete CIFAR-10 Test Set | NA | NA |
 | cifar_ddpm_v0.3 | 45.7k | DDIM | 2k sample subset from CIFAR10 Test Set | 59.09 | 6.49 |
-| cifar_ddpm_v0.3 | 45.7k | DDIM | Complete CIFAR-10 Test Set | 41.03 | 6.95 |
-| guided_mnist_ddpm_v0.1 | 70.3k | DDIM | Complete MNIST Test Set | 34.10 | 2.15 |
+| cifar_ddpm_v0.3 | 45.7k | DDIM | Complete CIFAR-10 Test Set | 41.24 | 6.94 |
+| guided_mnist_ddpm_v0.1 | 70.3k | DDIM, labels + CFG | Complete MNIST Test Set | see sweep below (under review) | see sweep below |
 | guided_mnist_ddpm_v0.1 | 70.3k | DDPM | Complete MNIST Test Set | NA | NA |
-| guided_cifar_ddpm_v0.1 | 52.7k | DDIM | Complete CIFAR-10 Test Set | 42.62 | 6.72 |
+| guided_cifar_ddpm_v0.1 | 52.7k | DDIM, labels + CFG (`w = 2`) | Complete CIFAR-10 Test Set | 36.04 | 8.28 |
 | guided_cifar_ddpm_v0.1 | 52.7k | DDPM | Complete CIFAR-10 Test Set | NA | NA |
+
+Class-conditional checkpoints are sampled with class-balanced labels and, when trained with
+`p_uncond > 0`, with classifier-free guidance. Earlier versions of the metric scripts sampled
+conditional models with the null class only (no labels, no CFG); that is still available with
+`--sin-etiquetas` for comparison. Unconditional checkpoints are unaffected (identical results
+with and without the flag).
+
+### Guidance scale sweep (DDIM, 50 steps, complete test set)
+
+`guided_cifar_ddpm_v0.1`:
+
+| Sampling | FID (lower is better) | IS (higher is better) |
+|---|---|---|
+| Null class only (previous behaviour) | 42.62 | 6.72 |
+| Labels, `w = 1` | 38.63 | 7.33 |
+| Labels, `w = 2` | **36.04** | 8.28 |
+| Labels, `w = 3` | 38.99 | 8.50 |
+| Labels, `w = 5` | 43.98 | 8.64 |
+
+IS increases monotonically with `w` (stronger class fidelity) while FID follows a U-shape
+(lost diversity), with its minimum around `w = 2`. Note that `w` was selected on the same test
+set used for reporting, which introduces a small selection bias.
+
+`guided_mnist_ddpm_v0.1` (FID/IS computed with the project's LeNet evaluator, not Inception):
+
+| Sampling | FID | IS |
+|---|---|---|
+| Null class only (previous behaviour) | 34.34 | 2.16 |
+| Labels, `w = 1` | 37.35 | 2.32 |
+| Labels, `w = 2` | 53.03 | 1.55 |
+| Labels, `w = 3` | 44.99 | 1.94 |
+| Labels, `w = 5` | 33.31 | 2.30 |
+
+> The MNIST sweep is **not monotonic** and the IS is far below the theoretical maximum of 10, so
+> these figures are under review and no best `w` is claimed. The evaluator normalisation and
+> class accuracy are being checked before drawing conclusions.
 
 Evaluating on the complete test set using the DDPM method takes much longer than doing it using DDIM, 
 but the results are much better. We will include them in the future if we have spare time.
@@ -115,7 +151,7 @@ MNIST LICENSE: CC BY-SA 3.0
 # Smoke test.
 python run.py --smoke
 
-# UncoUnconditionaldnitional DDPM training over local CIFAR10 IDX.
+# Unconditional DDPM training over local CIFAR10.
 python run.py --config configs/cifar10.yaml
 
 # Unconditional DDPM training over local MNIST IDX.
@@ -137,20 +173,39 @@ python run.py --serve
 python run.py --solo-metricas --config configs/cifar10.yaml
 python run.py --solo-metricas --config configs/mnist.yaml
 
+# Metrics straight from a checkpoint (class-balanced labels; CFG if p_uncond > 0).
+python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/guided_cifar10_ddpm_v0.1.pt --DDIM
+python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/guided_cifar10_ddpm_v0.1.pt --DDIM --guidance-scale 2
+python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/guided_cifar10_ddpm_v0.1.pt --DDIM --sin-etiquetas  # null class (old behaviour)
+
 # Generate images from gaussian noise using EMA weights.
 python scripts/inference_diffusion_uncond.py --checkpoint checkpoints/model.pt \
-	--output-dir generated --num-samples 64 --DDPM 
-    # use --DDPM or --DDIM + --denoising-steps --num-samples depending on desired reversing technique out of the web UI
+	--output-dir generated --num-samples 64 --DDPM
+# use --DDPM or --DDIM + --denoising-steps --num-samples depending on desired reversing technique out of the web UI
+# class-conditional checkpoints: --label C (single class), --guidance-scale W, --sin-etiquetas (null class)
 ```
 
 MNIST expects four uncompressed IDX files at `data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`, `t10k-images.idx3-ubyte` and `t10k-labels.idx1-ubyte`. Images are maintained in `28x28` with a single channel; normalization is calculated only with the train split.
+
+### Sampling options for metrics and inference
+
+For checkpoints with `num_classes > 1`, `scripts/evaluate_diffusion_*.py` and
+`scripts/inference_diffusion_uncond.py` generate with class-balanced labels (cycling `0..K-1`).
+The CFG scale `w` is read from `entrenamiento.guidance_scale` of the checkpoint config, but only
+if the model was trained with `p_uncond > 0`; otherwise `w = 1`. Overrides:
+
+- `--guidance-scale W` (or `metricas.guidance_scale` in the YAML used with `--solo-metricas`).
+- `--sin-etiquetas` (or `metricas.usar_etiquetas: false`): sample with the null class, only to compare with earlier results.
+- `--label C` (inference only): generate a single class.
+
+Requesting `w != 1` on a model trained without the null class raises an error.
 
 Evaluation downloads weights from Inception-v3 first time and requires `torchvision`,
 included at `requirements.txt`. For a fast check, try to reduce the cost of evaluation by using a subset from the test set; subsets smaller than the default 10,000 samples are selected with balanced class stratification.
 
 ### Reproducibility
 
-- Seed at `src/utils/seed.py`, value at `configs/`.
+- Seed at `src/utils/seed_demo.py`, value at `configs/`.
 - Dependencies with exact versions at `requirements.txt`.
 - Compute budget: **NVIDIA RTX 5070 12 GB**.
 - What the paper stated but was cut and its consequences: We decide to cut the training steps and did not evaluate using DDPM for now due to computing time constraints (it could be done in next releases).

@@ -11,6 +11,8 @@ the same model learns both conditional and unconditional predictions. During sam
 `entrenamiento.guidance_scale` combines those predictions; a value of `1` disables guidance.
 The developed models will be exposed in a web app that showcases the generation process: the initial full-noise state, the final denoised image, and the intermediate states in between. This makes it possible to see how the reverse-diffusion process gradually turns noise into structure, and to compare DDPM and DDIM sampling side by side.
 Because the training hardware and budget are private and limited, training time has been cut relative to the original papers. As a result, absolute quality metrics (FID, IS) are expected to fall short of the published figures. Every deviation from the papers is documented in the sections below, along with its likely consequences, so that results can be interpreted fairly rather than compared naively.
+
+
 [![License](https://img.shields.io/github/license/josuviteri/prism)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/josuviteri/prism/ci.yml?branch=main&label=CI)](.github/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/josuviteri/prism)](https://github.com/josuviteri/prism/releases)
@@ -73,7 +75,6 @@ For this checkpoint, IS increases across the tested guidance scales, while FID i
 | Labels, `w = 3` | 44.99 | 1.94 |
 | Labels, `w = 5` | 33.31 | 2.30 |
 
-> The MNIST sweep is non-monotonic and the IS values are low for a ten-class digit dataset. These results are **provisional**: no best guidance scale is claimed until the LeNet evaluator is checked against real MNIST data, generated-sample class accuracy is measured, and the samples are visually inspected. The MNIST FID uses a 128-dimensional LeNet embedding and is not directly comparable with the Inception-based CIFAR-10 FID.
 
 Evaluating on the complete test set using the DDPM method takes much longer than doing it using DDIM. We have not included DDPM metrics yet due to the available compute budget.
 ## Architecture

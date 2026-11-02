@@ -51,6 +51,54 @@ def cargar_evaluador(
     return model, cfg, checkpoint.get("normalizacion")
 
 
+def etiquetas_de_muestreo(
+    cfg: dict[str, Any],
+    inicio: int,
+    cantidad: int,
+    device: torch.device,
+    usar_etiquetas: bool = True,
+    clase: int | None = None,
+) -> Tensor | None:
+    """Labels for sampling, or None when the model is not class-conditional.
+
+    By default the classes are cycled (0, 1, ..., K-1, 0, ...) so the generated set is
+    class-balanced like the stratified test set. ``clase`` fixes a single class.
+    """
+    num_classes = int(cfg["modelo"].get("num_classes", 1))
+    if num_classes <= 1 or not usar_etiquetas:
+        if clase is not None:
+            raise ValueError("clase requires a class-conditional checkpoint and labels enabled")
+        return None
+    if clase is not None:
+        if not 0 <= clase < num_classes:
+            raise ValueError(f"clase must be in [0, {num_classes - 1}]")
+        return torch.full((cantidad,), clase, device=device, dtype=torch.long)
+    return torch.arange(inicio, inicio + cantidad, device=device, dtype=torch.long) % num_classes
+
+
+def escala_de_guiado(
+    cfg: dict[str, Any], usar_etiquetas: bool = True, guidance_scale: float | None = None
+) -> float:
+    """Effective CFG scale for sampling.
+
+    Guidance only makes sense if the model was trained with the null class
+    (``p_uncond > 0``). Without an explicit scale the value stored in the checkpoint
+    config is used for guided models and 1.0 (conditional only) otherwise.
+    """
+    num_classes = int(cfg["modelo"].get("num_classes", 1))
+    train_cfg = cfg.get("entrenamiento", {})
+    trained_null = float(train_cfg.get("p_uncond", 0.0)) > 0.0
+    can_guide = usar_etiquetas and num_classes > 1 and trained_null
+    if guidance_scale is None:
+        return float(train_cfg.get("guidance_scale", 1.0)) if can_guide else 1.0
+    scale = float(guidance_scale)
+    if scale != 1.0 and not can_guide:
+        raise ValueError(
+            "guidance_scale != 1 requires labels and a model trained with p_uncond > 0"
+        )
+    return scale
+
+
 def construir_difusion(cfg: dict[str, Any], device: torch.device) -> GaussianDiffusion:
     """Build the sampler using the schedule stored in the checkpoint config."""
     model_cfg = cfg["modelo"]

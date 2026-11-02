@@ -14,12 +14,16 @@ try:
         _save_image_grid,
         cargar_modelo,
         construir_difusion,
+        escala_de_guiado,
+        etiquetas_de_muestreo,
     )
 except ImportError:
     from ddpm_utils import (
         _save_image_grid,
         cargar_modelo,
         construir_difusion,
+        escala_de_guiado,
+        etiquetas_de_muestreo,
     )
 
 
@@ -42,6 +46,12 @@ def main() -> int:
             "or the checkpoint's timestep count when it is lower."
         ),
     )
+    parser.add_argument("--label", type=int, default=None, metavar="C",
+                        help="Generate only class C (class-conditional checkpoints).")
+    parser.add_argument("--sin-etiquetas", action="store_true",
+                        help="Sample with the null class instead of class labels.")
+    parser.add_argument("--guidance-scale", type=float, default=None,
+                        help="CFG scale w (default: value stored in the checkpoint config).")
     inference = parser.add_mutually_exclusive_group(required=True)
     inference.add_argument("--DDPM", action="store_true", help="Use the DDPM inference method for sampling")
     inference.add_argument("--DDIM", action="store_true", help="Use the DDIM inference method for sampling")
@@ -60,6 +70,11 @@ def main() -> int:
 
     model, cfg = cargar_modelo(args.checkpoint, device)
     diffusion = construir_difusion(cfg, device)
+    try:
+        guidance = escala_de_guiado(cfg, not args.sin_etiquetas, args.guidance_scale)
+        etiquetas_de_muestreo(cfg, 0, 1, device, not args.sin_etiquetas, args.label)
+    except ValueError as error:
+        parser.error(str(error))
     if args.denoising_steps is not None:
         if not args.DDIM:
             parser.error("--denoising-steps is only supported with --DDIM")
@@ -85,14 +100,14 @@ def main() -> int:
     while written < args.num_samples:
         count = min(args.batch_size, args.num_samples - written)
         batch_started = time.perf_counter()
-        if cfg["datos"]["nombre"] == "mnist" and args.DDIM:
-            generated = diffusion.sample_ddim(model, (count, 1, 28, 28), sampling_steps=sampling_steps)
-        elif cfg["datos"]["nombre"] == "cifar10" and args.DDIM:
-            generated = diffusion.sample_ddim(model, (count, 3, 32, 32), sampling_steps=sampling_steps)
-        elif args.DDPM and cfg["datos"]["nombre"] == "mnist":
-            generated = diffusion.sample(model, (count, 1, 28, 28))
-        elif args.DDPM and cfg["datos"]["nombre"] == "cifar10":
-            generated = diffusion.sample(model, (count, 3, 32, 32))
+        shape = (count, 1, 28, 28) if cfg["datos"]["nombre"] == "mnist" else (count, 3, 32, 32)
+        labels = etiquetas_de_muestreo(cfg, written, count, device, not args.sin_etiquetas, args.label)
+        if args.DDIM:
+            generated = diffusion.sample_ddim(
+                model, shape, sampling_steps=sampling_steps, labels=labels, guidance_scale=guidance
+            )
+        else:
+            generated = diffusion.sample(model, shape, labels=labels, guidance_scale=guidance)
         generated_batches.append(generated)
         written += count
         batch_seconds = time.perf_counter() - batch_started

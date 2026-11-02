@@ -11,9 +11,15 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset, Subset
 
 try:
-    from .ddpm_utils import cargar_modelo, cargar_evaluador, construir_difusion, construir_test_loader_con_batch, obtener_normalizacion
+    from .ddpm_utils import (
+        cargar_modelo, cargar_evaluador, construir_difusion, construir_test_loader_con_batch,
+        escala_de_guiado, etiquetas_de_muestreo, obtener_normalizacion,
+    )
 except ImportError:
-    from ddpm_utils import cargar_modelo, cargar_evaluador, construir_difusion, construir_test_loader_con_batch, obtener_normalizacion
+    from ddpm_utils import (
+        cargar_modelo, cargar_evaluador, construir_difusion, construir_test_loader_con_batch,
+        escala_de_guiado, etiquetas_de_muestreo, obtener_normalizacion,
+    )
 
 
 def _normalizar_para_evaluador(
@@ -107,8 +113,15 @@ def evaluar(
     device_name: str = "auto",
     seed: int = 42,
     method: str = "DDPM",
+    usar_etiquetas: bool = True,
+    guidance_scale: float | None = None,
 ) -> dict[str, float]:
-    """Evaluate a MNIST checkpoint and return IS/FID metrics."""
+    """Evaluate a MNIST checkpoint and return IS/FID metrics.
+
+    Class-conditional checkpoints are sampled with class-balanced labels. Guided ones
+    (trained with p_uncond > 0) use CFG with ``guidance_scale`` (default: the value in the
+    checkpoint config). ``usar_etiquetas=False`` reproduces the old null-class sampling.
+    """
     if num_samples < 2 or batch_size < 1:
         raise ValueError("num_samples must be at least 2 and batch_size must be positive")
     if not checkpoint.is_file():
@@ -144,6 +157,7 @@ def evaluar(
     if num_samples < len(loader.dataset):
         loader = _stratified_loader(loader, num_samples, seed)
     diffusion = construir_difusion(cfg, device)
+    guidance = escala_de_guiado(cfg, usar_etiquetas, guidance_scale)
     sampling_steps = diffusion.timesteps
     if method == "DDIM":
         sampling_steps = int(cfg["modelo"].get("ddim_timesteps", min(50, diffusion.timesteps)))
@@ -154,7 +168,9 @@ def evaluar(
     print(
         f"checkpoint={checkpoint} device={device} "
         f"sampling_steps={sampling_steps} samples={num_samples} "
-        f"batch_size={batch_size} seed={seed} evaluator={evaluator_checkpoint}"
+        f"batch_size={batch_size} seed={seed} evaluator={evaluator_checkpoint} "
+        f"labels={usar_etiquetas and int(cfg['modelo'].get('num_classes', 1)) > 1} "
+        f"guidance_scale={guidance}"
     )
 
     real_features = []
@@ -184,10 +200,14 @@ def evaluar(
             if cfg["datos"]["nombre"] != "mnist":
                 raise ValueError(f"Unsupported dataset for IS/FID evaluation: {cfg['datos']['nombre']}")
             shape = (count, 1, 28, 28)
+            labels = etiquetas_de_muestreo(cfg, seen, count, device, usar_etiquetas)
             generated = (
-                diffusion.sample_ddim(model, shape, sampling_steps=sampling_steps)
+                diffusion.sample_ddim(
+                    model, shape, sampling_steps=sampling_steps,
+                    labels=labels, guidance_scale=guidance,
+                )
                 if method == "DDIM"
-                else diffusion.sample(model, shape)
+                else diffusion.sample(model, shape, labels=labels, guidance_scale=guidance)
             )
             evaluator_images = _normalizar_para_evaluador(
                 generated, source_mean, source_std, evaluator_mean, evaluator_std
@@ -222,6 +242,10 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--sin-etiquetas", action="store_true",
+                        help="Sample with the null class (previous behaviour, for comparison).")
+    parser.add_argument("--guidance-scale", type=float, default=None,
+                        help="CFG scale w (default: value stored in the checkpoint config).")
     inference = parser.add_mutually_exclusive_group(required=True)
     inference.add_argument("--DDPM", action="store_true")
     inference.add_argument("--DDIM", action="store_true")
@@ -229,6 +253,7 @@ def main() -> int:
     evaluar(
         args.checkpoint, args.evaluator_checkpoint, args.num_samples, args.batch_size,
         args.device, args.seed, "DDIM" if args.DDIM else "DDPM",
+        usar_etiquetas=not args.sin_etiquetas, guidance_scale=args.guidance_scale,
     )
     return 0
 

@@ -18,7 +18,9 @@ Because the training hardware and budget are private and limited, training time 
 [![Latest release](https://img.shields.io/github/v/release/josuviteri/prism)](https://github.com/josuviteri/prism/releases)
 [![Contributors](https://img.shields.io/github/contributors/josuviteri/prism)](https://github.com/josuviteri/prism/graphs/contributors)
 [![Open Issues](https://img.shields.io/github/issues/josuviteri/prism)](https://github.com/josuviteri/prism/issues)
+
 [Roadmap](#roadmap) | [Installation](#installation) | [Contributing](CONTRIBUTING.md) | [License](#license)
+
 # References
 Replication of **Jonathan Ho, Ajay Jain & Pieter Abbeel, 2020 ·  DDPM**, **Jiaming Song, Chenlin Meng & Stefano Ermon, 2021 · (DDIM)**, **Jonathan Ho & Tim Salimans, 2022 · (CFG)**, over **MNIST** and **CIFAR-10** datasets,
 with a web UI for experimental guided generation on top.

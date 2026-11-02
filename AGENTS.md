@@ -14,12 +14,10 @@ Dos páginas se leen enteras. Quince, no.
 
 ## Qué es esto
 
-PRISM replica DDPM, DDIM y Classifier-Free Guidance (CFG) para MNIST y CIFAR-10.
-La base ejecutable es un DDPM PyTorch con U-Net condicional por clase
-(`num_classes`, clase nula en el índice `K`), entrenamiento con EMA, muestreo
-DDPM/DDIM con guiado y métricas FID/IS (Inception-v3 en CIFAR-10, LeNet en MNIST).
-Los scripts de métricas e inferencia muestrean con etiquetas de clase y, en los
-modelos entrenados con `p_uncond > 0`, con CFG.
+PRISM replica DDPM y prepara una ampliación con Classifier-Free Guidance (CFG)
+para MNIST y CIFAR-10. La base ejecutable actual es un DDPM PyTorch
+incondicional para CIFAR-10 usando las imágenes PNG y `trainLabels.csv` locales.
+MNIST y el conditioning por clase todavía están pendientes.
 
 ## Restricciones del curso
 
@@ -84,19 +82,19 @@ Torch CPU.
 - Hecho: entrenamiento, evaluación y checkpoint EMA de CIFAR-10 en PyTorch;
   smoke validado en GPU; logging de métricas y Artifacts de W&B preparado.
 - En curso: redactar tests funcionales del pipeline y completar CI.
-- Hecho: MNIST (loader, configs, evaluador LeNet), etiquetas de clase en la U-Net
-  y CFG en el muestreo.
-- Pendiente: filas DDPM de la tabla de resultados; barrido de la escala de
-  guiado `w`; al modificar los módulos `*_demo.py`, renombrarlos a la hora de
-  importarlos en otros ficheros.
+- Pendiente: implementar loader/modelo/loop de MNIST; añadir etiquetas de clase
+  al U-Net y al loop para CFG; generar muestras durante evaluación; completar
+  `src/app`; al modificar los módulos `*_demo.py`, renombrarlos a la hora de
+  importarlos en otros ficheros .
 
-## Evaluación con etiquetas y guiado
+## Para añadir MNIST
 
-`scripts/evaluate_diffusion_*.py` e `inference_diffusion_uncond.py` generan con
-etiquetas equilibradas si el checkpoint tiene `num_classes > 1`. La escala `w`
-sale de `entrenamiento.guidance_scale` solo si `p_uncond > 0`; se puede fijar con
-`--guidance-scale` (o `metricas.guidance_scale` en el YAML). `--sin-etiquetas`
-recupera el muestreo con clase nula, solo para comparar.
+Implementar en `src/data/loaders.py` el dataset local IDX o su exportación PNG,
+con imágenes `(1, 28, 28)`, y eliminar el `NotImplementedError` de
+`construir_datasets`. Después añadir una configuración `configs/mnist.yaml`, un
+constructor de modelo con `in_ch=1`, y un loop equivalente que comparta la
+difusión, EMA, evaluación, checkpoint y tracking. Añadir primero tests de
+forma, split, normalización y un smoke MNIST antes de entrenar.
 
 Para CFG, el modelo debe recibir `y` opcional, reservar una clase null y
 aplicar dropout de condición durante entrenamiento. En sampling hay que

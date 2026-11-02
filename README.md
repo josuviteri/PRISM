@@ -37,14 +37,7 @@ with a web UI for experimental guided generation on top.
 - **Authors:** **[Josu Viteri](https://www.linkedin.com/in/josu-viteri/)** & **[Gotzon Viteri](https://www.linkedin.com/in/gotzonviteri/)**
 ## Decisions Papers Didn't Specify
 
-- Noise schedule: linear `beta` from 1e-4 to 0.02 over 1000 steps (computed in float64).
-- Reverse process: fixed variance `beta_t`; the predicted `x_0` is clipped to [-1, 1] at every step.
-- DDIM: `eta = 0` on an evenly spaced subsequence of the training steps (50 by default).
-- Weights used for sampling: EMA with decay 0.9995 and warm-up.
-- Class conditioning: a learned embedding of `K + 1` entries added to the time embedding; index `K` is the null class.
-- CFG: `eps = eps(null) + w * (eps(c) - eps(null))`; `w = 1` is plain conditional sampling.
-- Metric sampling: class-balanced labels, and CFG with the checkpoint's `guidance_scale` only if it was trained with `p_uncond > 0`.
-- Precision: bfloat16 autocast on GPU; single-head attention.
+NA
 
 ## Results
 

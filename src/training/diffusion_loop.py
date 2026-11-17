@@ -290,6 +290,41 @@ def evaluar(
     return {"val/loss": total_loss.item() / max(total_items, 1)}
 
 
+def _metricas_duras(cfg: dict[str, Any], checkpoint: Path, device: torch.device) -> dict[str, float]:
+    """Calcula FID e IS sobre el checkpoint recien guardado.
+
+    Restaura el estado del RNG al terminar: ``evaluar`` llama a ``torch.manual_seed`` y,
+    sin ``fork_rng``, alteraria la secuencia aleatoria del entrenamiento en curso.
+    """
+    from scripts import evaluate_diffusion_cifar10, evaluate_diffusion_mnist  # import perezoso
+
+    metric_cfg = cfg["metricas"]
+    common = {
+        "checkpoint": checkpoint,
+        "num_samples": int(metric_cfg.get("num_samples_intermedias", 2000)),
+        "batch_size": int(metric_cfg.get("batch_size", 256)),
+        "device_name": device.type,
+        "seed": int(cfg["experimento"]["seed"]),
+        "method": str(metric_cfg.get("metodo", "DDIM")).upper(),
+        "usar_etiquetas": bool(metric_cfg.get("usar_etiquetas", True)),
+        "guidance_scale": (
+            None if metric_cfg.get("guidance_scale") is None
+            else float(metric_cfg["guidance_scale"])
+        ),
+    }
+    if device.type == "cuda":
+        torch.cuda.empty_cache()  # libera la cache reservada por el entrenamiento
+    with torch.random.fork_rng(devices=[device] if device.type == "cuda" else []):
+        if cfg["datos"]["nombre"] == "mnist":
+            result = evaluate_diffusion_mnist.evaluar(
+                evaluator_checkpoint=Path(metric_cfg["evaluator_checkpoint"]), **common)
+        else:
+            result = evaluate_diffusion_cifar10.evaluar(**common)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    return result
+
+
 def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], run=None) -> dict[str, float]:
     """Trains a DDPM and writes model + EMA weights (and resume state) to disk every epoch."""
     device = _device(cfg)
@@ -408,6 +443,11 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             _save_image_grid(samples, grid_path)
             _log_image(run, grid_path, global_step)
             print(f"saved {sample_count} EMA samples to {grid_path}")
+        metric_every = int(cfg.get("metricas", {}).get("cada_epocas", 0))
+        if metric_every and ((epoch + 1) % metric_every == 0 or finished):
+            hard = _metricas_duras(cfg, checkpoint, device)
+            registrar(run, {f"eval/{k}": v for k, v in hard.items()}, paso=global_step)
+            print(f"epoch {epoch + 1}: " + " ".join(f"eval/{k}={v:.4f}" for k, v in hard.items()))
         if finished:
             break
 

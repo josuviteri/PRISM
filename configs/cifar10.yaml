@@ -51,6 +51,8 @@ metricas:
   batch_size: 512
   dispositivo: auto
   metodo: DDIM
+  frec_epochs: 50                # FID/IS durante el entrenamiento (0 = desactivado)
+  num_samples_intermedias: 2000  # subconjunto estratificado; sesgado al alza frente al test completo
 
 wandb:
   proyecto: PRISM

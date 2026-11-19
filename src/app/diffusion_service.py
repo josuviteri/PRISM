@@ -11,7 +11,7 @@ import torch
 from PIL import Image
 from torch import Tensor, nn
 
-from src.models.unet import model as build_unet
+from src.models.factory import construir_modelo_desde_config
 from src.utils.diffusion_utils import GaussianDiffusion
 
 
@@ -56,19 +56,8 @@ def discover_checkpoints(directory: Path) -> dict[str, CheckpointInfo]:
 
 
 def _build_model(config: dict[str, Any]) -> nn.Module:
-    """Build the unconditional U-Net described by a saved checkpoint config."""
-    model_config = config["modelo"]
-    channels = 1 if config["datos"]["nombre"] == "mnist" else 3
-    return build_unet(
-        in_ch=channels,
-        out_ch=channels,
-        ch=model_config["base_channels"],
-        ch_mult=tuple(model_config["channel_multipliers"]),
-        num_res_blocks=model_config["residual_blocks"],
-        attn_resolutions=tuple(model_config["attention_resolutions"]),
-        dropout=model_config["dropout"],
-        num_classes=model_config.get("num_classes", 1),
-    )
+    """Build the U-Net or DiT described by a saved checkpoint config."""
+    return construir_modelo_desde_config(config)
 
 
 def image_grid(images: Tensor) -> Image.Image:

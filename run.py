@@ -3,8 +3,8 @@
 Punto de entrada unico del proyecto.
 
     python run.py --smoke                        # pipeline entero en miniatura, < 5 min en CPU
-    python run.py --config configs/default.yaml  # entrenamiento completo, < 20 min en T4
-    python run.py --config configs/default.yaml --solo-evaluar
+    python run.py                                # entrenamiento completo, < 20 min en T4
+    python run.py --config configs/cifar10.yaml --solo-evaluar
 
 Este fichero es deliberadamente corto: orquesta, no implementa. La logica vive
 en src/. Si run.py crece por encima de un centenar de lineas, algo tendria que
@@ -41,7 +41,7 @@ def cargar_config(ruta: Path) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--config", type=Path, default=Path("configs/default.yaml"),
+    ap.add_argument("--config", type=Path, default=Path("configs/cifar10.yaml"),
                     help="fichero de configuracion")
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--smoke", action="store_true",

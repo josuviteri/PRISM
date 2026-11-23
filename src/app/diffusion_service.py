@@ -137,7 +137,7 @@ class DiffusionExplorer:
         return image_grid(noise), image_grid(samples), frames, info, steps
 
     def _model(self, info: CheckpointInfo) -> tuple[nn.Module, dict[str, Any]]:
-        """Load and cache the EMA U-Net held in a selected checkpoint."""
+        """Load and cache the EMA model (U-Net or DiT) held in a checkpoint."""
         cached = self._loaded.get(info.identifier)
         if cached is not None:
             return cached

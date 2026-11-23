@@ -271,3 +271,16 @@ def test_dit_configs_build_the_expected_architecture(config_name):
     model = construir_modelo(config)
     assert isinstance(model, DiT)
     assert model.num_classes == config["modelo"].get("num_classes", 1)
+
+
+@pytest.mark.parametrize(
+    "config_name",
+    ["dit_cifar10", "guided_dit_cifar10", "dit_mnist", "guided_dit_mnist"],
+)
+def test_full_dit_configs_enable_hard_metrics_during_training(config_name):
+    """Non-smoke DiT configs keep the FID/IS cadence added by the hard-metrics feature."""
+    root = Path(__file__).resolve().parents[1]
+    config = yaml.safe_load((root / "configs" / f"{config_name}.yaml").read_text(encoding="utf-8"))
+    metrics = config["metricas"]
+    assert metrics["cada_epocas"] > 0
+    assert metrics["num_samples_intermedias"] >= 2

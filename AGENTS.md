@@ -34,8 +34,8 @@ selecciona por configuración.
 ```bash
 source .venv/bin/activate
 python run.py --smoke                          # pipeline entero en miniatura
-python run.py --config configs/default.yaml    # entrenamiento completo
-python run.py --config configs/default.yaml --solo-evaluar
+python run.py                                  # entrenamiento completo (configs/cifar10.yaml)
+python run.py --config configs/cifar10.yaml --solo-evaluar
 python run.py --config configs/smoke_dit.yaml  # smoke del pipeline DiT
 pytest tests/ -q
 python tools/tiiac_check.py .                  # cuando exista el checker
@@ -46,7 +46,7 @@ pequeño, 10 pasos de difusión y como máximo 10 batches. Sirve para comprobar
 que carga datos, construye el U-Net, entrena, evalúa y escribe un checkpoint;
 no sirve para medir calidad generativa.
 
-El entrenamiento completo usa `configs/default.yaml`. Los hiperparámetros se
+El entrenamiento completo usa `configs/cifar10.yaml`. Los hiperparámetros se
 cambian ahí, no en el código. `dispositivo: auto` elige CUDA si está
 disponible y CPU en caso contrario.
 

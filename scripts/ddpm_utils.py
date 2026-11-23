@@ -30,7 +30,6 @@ def cargar_modelo(checkpoint_path: Path, device: torch.device) -> tuple[nn.Modul
     if "config" not in checkpoint or "ema" not in checkpoint:
         raise ValueError("checkpoint must contain 'config' and 'ema' entries")
     cfg = checkpoint["config"]
-    construir_modelo
     model = construir_modelo(cfg)
     model.load_state_dict(checkpoint["ema"])
     model.to(device).eval()

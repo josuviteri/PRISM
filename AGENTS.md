@@ -1,23 +1,12 @@
 # Contexto del proyecto
 
-<!--
-Fichero de contexto para asistentes de IA (Claude Code, Copilot, Cursor…).
-Se explica en la sesión A1 del 9 de noviembre.
-
-Dos criterios para escribirlo:
-  1. Va lo que le dirías a alguien que se incorpora hoy al proyecto.
-  2. Si te encuentras repitiendo la misma corrección tres veces, esa
-     corrección va aquí.
-
-Dos páginas se leen enteras. Quince, no.
--->
-
 ## Qué es esto
 
-PRISM replica DDPM y prepara una ampliación con Classifier-Free Guidance (CFG)
-para MNIST y CIFAR-10. La base ejecutable actual es un DDPM PyTorch
-incondicional para CIFAR-10 usando las imágenes PNG y `trainLabels.csv` locales.
-MNIST y el conditioning por clase todavía están pendientes.
+PRISM replica DDPM, DDIM y Classifier-Free Guidance (CFG) sobre MNIST y
+CIFAR-10 con un U-Net en PyTorch. Hay configuraciones incondicionales
+(`cifar10.yaml`, `mnist.yaml`) y guiadas por clase (`guided_cifar10.yaml`,
+`guided_mnist.yaml`), un clasificador LeNet que actúa de evaluador para FID/IS
+de MNIST (`mnist_evaluator.yaml`) y un aplicativo web (`src/app/`).
 
 ## Restricciones del curso
 
@@ -32,11 +21,13 @@ MNIST y el conditioning por clase todavía están pendientes.
 
 ```bash
 source .venv/bin/activate
-python run.py --smoke                          # pipeline entero en miniatura
-python run.py --config configs/default.yaml    # entrenamiento completo
-python run.py --config configs/default.yaml --solo-evaluar
+python run.py --smoke                                   # pipeline entero en miniatura
+python run.py --config configs/cifar10.yaml             # entrenamiento completo (también mnist, guided_*, mnist_evaluator)
+python run.py --config configs/cifar10.yaml --solo-evaluar   # loss de validación desde el checkpoint, sin entrenar
+python run.py --config configs/cifar10.yaml --solo-metricas  # FID/IS desde el checkpoint (sección `metricas:`)
+python run.py --serve                                   # aplicativo web
 pytest tests/ -q
-python tools/tiiac_check.py .                  # cuando exista el checker
+python tools/tiiac_check_demo.py .                      # checker del curso
 ```
 
 `--smoke` selecciona `configs/smoke.yaml`: usa solo 64 imágenes, un modelo
@@ -44,21 +35,28 @@ pequeño, 10 pasos de difusión y como máximo 10 batches. Sirve para comprobar
 que carga datos, construye el U-Net, entrena, evalúa y escribe un checkpoint;
 no sirve para medir calidad generativa.
 
-El entrenamiento completo usa `configs/default.yaml`. Los hiperparámetros se
-cambian ahí, no en el código. `dispositivo: auto` elige CUDA si está
-disponible y CPU en caso contrario.
+Los hiperparámetros se cambian en `configs/`, no en el código. `dispositivo:
+auto` elige CUDA si está disponible y CPU en caso contrario.
 
-Los checkpoints se guardan en `checkpoints/<experimento.nombre>.pt`. El fichero
-contiene los pesos normales, los pesos EMA y la configuración usada. La carpeta
-está ignorada por Git. Cuando W&B está activo, el checkpoint final también se
-sube como Artifact de tipo `model`; las métricas se registran por época.
-Configura `wandb.entidad`, deja `wandb.modo: online` y ejecuta `wandb login`
-antes del entrenamiento. Para smoke/tests usa `wandb.modo: disabled`.
+Los checkpoints se guardan en `checkpoints/<experimento.nombre>.pt`; la carpeta
+está ignorada por Git.
 
-El entorno de desarrollo validado usa `torch==2.14.1+cu130` sobre una GPU
-NVIDIA RTX 5070. La instalación de esa versión puede requerir el índice de
-paquetes CUDA que corresponda a la máquina; no sustituirla automáticamente por
-Torch CPU.
+- Difusión: pesos normales (`model`), pesos EMA (`ema`) y configuración usada.
+  `--solo-evaluar` carga `ema`.
+- Evaluador MNIST (`format: mnist_evaluator_v1`): `model`, `config`,
+  `normalizacion` y métricas; **no tiene EMA**. `--solo-evaluar` carga `model`.
+
+W&B: las métricas se registran por época (`train/*`, `val/*`) y el checkpoint
+final se sube como Artifact de tipo `model` con el nombre del experimento. La
+run se llama `<experimento.nombre>` (y `<experimento.nombre>_eval` en
+`--solo-metricas`). Configura `wandb.entidad`, deja `wandb.modo: online` y
+ejecuta `wandb login` antes de entrenar. `configs/smoke.yaml` usa
+`wandb.modo: offline`; los tests usan `wandb.modo: disabled`.
+
+El entorno de desarrollo validado usa `torch==2.14.1` (build `+cu130`) sobre una
+GPU NVIDIA RTX 5070 (Python 3.11 en CI). La instalación de esa versión puede
+requerir el índice de paquetes CUDA que corresponda a la máquina; no sustituirla
+automáticamente por Torch CPU.
 
 ## Convenciones
 
@@ -68,36 +66,24 @@ Torch CPU.
   Lo contrario es una fuga de datos: no da error e infla la métrica.
 - El `data augmentation` se aplica a train, jamás a validación ni a test.
 - `src/app/` no importa nada de `src/training/`: el aplicativo solo carga un
-  checkpoint y responde. El servicio ejecutable todavía necesita migrarse de
-  `serve_demo.py` al checkpoint DDPM actual.
+  checkpoint y responde.
+- **`guidance_scale`:** `1.0` = solo predicción condicional (sin guidance) y
+  `0.0` = predicción incondicional pura. En modelos sin clases
+  (`num_classes: 1`) la escala se ignora.
 
 ## Lo que NO hay que tocar
 
-- `src/data/splits.py`: los splits están congelados desde el hito H3.
-- No reintroducir `torchvision` en el loader actual: CIFAR-10 se lee con
-  Pillow para evitar dependencia de backend.
+- Los splits de `src/data/loaders.py` (`construir_datasets`): están congelados
+  desde el hito H3.
+- CIFAR-10 y MNIST se leen con Pillow/IDX propio en `loaders.py`, sin
+  `torchvision.datasets`. `torchvision` solo se usa para los pesos de
+  Inception-v3 en la evaluación FID/IS de CIFAR-10.
 
 ## Estado actual
 
-- Hecho: entrenamiento, evaluación y checkpoint EMA de CIFAR-10 en PyTorch;
-  smoke validado en GPU; logging de métricas y Artifacts de W&B preparado.
-- En curso: redactar tests funcionales del pipeline y completar CI.
-- Pendiente: implementar loader/modelo/loop de MNIST; añadir etiquetas de clase
-  al U-Net y al loop para CFG; generar muestras durante evaluación; completar
-  `src/app`; al modificar los módulos `*_demo.py`, renombrarlos a la hora de
-  importarlos en otros ficheros .
-
-## Para añadir MNIST
-
-Implementar en `src/data/loaders.py` el dataset local IDX o su exportación PNG,
-con imágenes `(1, 28, 28)`, y eliminar el `NotImplementedError` de
-`construir_datasets`. Después añadir una configuración `configs/mnist.yaml`, un
-constructor de modelo con `in_ch=1`, y un loop equivalente que comparta la
-difusión, EMA, evaluación, checkpoint y tracking. Añadir primero tests de
-forma, split, normalización y un smoke MNIST antes de entrenar.
-
-Para CFG, el modelo debe recibir `y` opcional, reservar una clase null y
-aplicar dropout de condición durante entrenamiento. En sampling hay que
-calcular predicción condicional e incondicional y combinarlas con la escala
-CFG configurada. Es una extensión posterior, no está implementada en el
-checkpoint CIFAR actual.
+- Hecho: entrenamiento y evaluación DDPM/DDIM de CIFAR-10 y MNIST, CFG con
+  clase null y dropout de condición, evaluador LeNet para MNIST, métricas
+  FID/IS, aplicativo web, logging de métricas y Artifacts en W&B.
+- En curso: ampliar tests funcionales del pipeline y completar CI.
+- Pendiente: métricas con DDPM sobre el test completo (coste de cómputo);
+  renombrar los módulos `*_demo.py` (al renombrar, actualizar los imports).

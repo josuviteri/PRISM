@@ -3,8 +3,8 @@
 Punto de entrada unico del proyecto.
 
     python run.py --smoke                        # pipeline entero en miniatura, < 5 min en CPU
-    python run.py --config configs/default.yaml  # entrenamiento completo, < 20 min en T4
-    python run.py --config configs/default.yaml --solo-evaluar
+    python run.py --config configs/cifar10.yaml  # entrenamiento completo, < 20 min en T4
+    python run.py --config configs/cifar10.yaml --solo-evaluar
 
 Este fichero es deliberadamente corto: orquesta, no implementa. La logica vive
 en src/. Si run.py crece por encima de un centenar de lineas, algo tendria que
@@ -41,7 +41,7 @@ def cargar_config(ruta: Path) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--config", type=Path, default=Path("configs/default.yaml"),
+    ap.add_argument("--config", type=Path, default=Path("configs/cifar10.yaml"),
                     help="fichero de configuracion")
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--smoke", action="store_true",
@@ -143,8 +143,14 @@ def main() -> int:
             print(f"error: no existe el checkpoint {checkpoint}", file=sys.stderr)
             return 2
         estado = torch.load(checkpoint, map_location="cpu", weights_only=True)
-        modelo.load_state_dict(estado["ema"])
-        modelo.to(diffusion_loop._device(cfg))
+        # El evaluador MNIST guarda solo "model"; los checkpoints de difusion guardan "ema".
+        clave = "model" if mnist_evaluator else "ema"
+        if clave not in estado:
+            print(f"error: el checkpoint {checkpoint} no contiene '{clave}'", file=sys.stderr)
+            return 2
+        modelo.load_state_dict(estado[clave])
+        loop = mnist_evaluator_loop if mnist_evaluator else diffusion_loop
+        modelo.to(loop._device(cfg))
     else:
         if mnist_evaluator:
             mnist_evaluator_loop.entrenar(modelo, train_loader, val_loader, cfg, run)

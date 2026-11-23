@@ -92,6 +92,8 @@ def escala_de_guiado(
     if guidance_scale is None:
         return float(train_cfg.get("guidance_scale", 1.0)) if can_guide else 1.0
     scale = float(guidance_scale)
+    if num_classes <= 1:
+        return 1.0  # unconditional model: nothing to guide, any scale is a no-op
     if scale != 1.0 and not can_guide:
         raise ValueError(
             "guidance_scale != 1 requires labels and a model trained with p_uncond > 0"

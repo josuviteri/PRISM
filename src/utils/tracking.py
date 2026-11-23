@@ -23,7 +23,7 @@ def abrir_run(cfg: dict, evaluar: bool = False) -> Any | None:
         return None
 
     return wandb.init(
-        project=wcfg.get("proyecto", "tiiac-2026"),
+        project=wcfg.get("proyecto", "PRISM"),
         entity=wcfg.get("entidad"),
         name=(
             f"{cfg['experimento']['nombre']}_eval"

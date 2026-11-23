@@ -55,3 +55,9 @@ def test_unguided_conditional_model_rejects_guidance():
     assert ddpm_utils.escala_de_guiado(cfg) == 1.0
     with pytest.raises(ValueError):
         ddpm_utils.escala_de_guiado(cfg, guidance_scale=3.0)
+
+
+def test_unconditional_model_ignores_zero_guidance_scale():
+    cfg = _cfg(1, 0.0, 0.0)
+    assert ddpm_utils.escala_de_guiado(cfg) == 1.0
+    assert ddpm_utils.escala_de_guiado(cfg, guidance_scale=0.0) == 1.0

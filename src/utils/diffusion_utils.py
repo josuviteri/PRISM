@@ -84,7 +84,9 @@ class GaussianDiffusion:
         guidance_scale: float,
     ) -> Tensor:
         if labels is None:
-            if guidance_scale != 1.0:
+            # An unconditional denoiser has no class to guide on: the scale is meaningless
+            # (e.g. guidance_scale: 0.0 in unconditional configs) and is ignored.
+            if guidance_scale != 1.0 and getattr(denoiser, "num_classes", 1) > 1:
                 raise ValueError("guidance_scale requires class labels")
             return denoiser(sample, timesteps)
         num_classes = getattr(denoiser, "num_classes", 1)

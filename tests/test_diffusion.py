@@ -66,6 +66,31 @@ def test_cfg_combines_conditional_and_unconditional_predictions():
     assert torch.equal(prediction, expected)
 
 
+@pytest.mark.parametrize("scale", [0.0, 1.0, 3.0])
+def test_unconditional_denoiser_ignores_guidance_scale(scale):
+    diffusion = GaussianDiffusion(1, 0.01, 0.01, torch.device("cpu"))
+    sample = torch.zeros(2, 1, 2, 2)
+    prediction = diffusion._predict_noise(
+        ZeroDenoiser(), sample, torch.zeros(2, dtype=torch.long), None, guidance_scale=scale)
+    assert torch.equal(prediction, torch.zeros_like(sample))
+
+
+def test_conditional_denoiser_without_labels_rejects_guidance():
+    diffusion = GaussianDiffusion(1, 0.01, 0.01, torch.device("cpu"))
+    with pytest.raises(ValueError):
+        diffusion._predict_noise(
+            LabelDenoiser(), torch.zeros(2, 1, 2, 2), torch.zeros(2, dtype=torch.long),
+            None, guidance_scale=0.0)
+
+
+def test_guidance_scale_zero_is_pure_unconditional():
+    diffusion = GaussianDiffusion(1, 0.01, 0.01, torch.device("cpu"))
+    prediction = diffusion._predict_noise(
+        LabelDenoiser(), torch.zeros(2, 1, 2, 2), torch.zeros(2, dtype=torch.long),
+        torch.tensor([1, 2]), guidance_scale=0.0)
+    assert torch.equal(prediction, torch.full((2, 1, 2, 2), 3.0))
+
+
 def test_ema_tracks_parameters_and_copies_buffers():
     model = nn.BatchNorm1d(2)
     ema = ExponentialMovingAverage(model, decay=0.9, warmup=False)

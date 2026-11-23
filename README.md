@@ -216,7 +216,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 pytest tests/ -q
 ```
 
-The evaluation changes add tests for balanced sampling labels and CFG-scale validation in `tests/test_sampling_labels.py`. The DiT tests in `tests/test_dit.py` cover CIFAR-10 and MNIST shapes, class conditioning, CFG prediction, DDIM sampling, architecture dispatch, app checkpoint loading and every shipped DiT config.
+Tests cover diffusion/CFG maths (`tests/test_diffusion.py`), balanced sampling labels and CFG-scale validation (`tests/test_sampling_labels.py`), the data/training pipeline (`tests/test_ddpm_pipelines.py`), the web service (`tests/test_app_service.py`), `run.py --solo-evaluar` on the MNIST evaluator checkpoint (`tests/test_run_solo_evaluar.py`), reproducibility and the course checker. The DiT tests in `tests/test_dit.py` cover CIFAR-10 and MNIST shapes, class conditioning, CFG prediction, DDIM sampling, architecture dispatch, app checkpoint loading and every shipped DiT config.
 
 ## Contributing
 ## Roadmap

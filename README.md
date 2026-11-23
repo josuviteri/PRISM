@@ -5,7 +5,7 @@
 _Research project based on DDPM, DDIM and CFG papers._
 PRISM is a research initiative aimed at understanding unconditional and guided diffusion models for image generation. The project replicates three foundational papers: DDPM for the core denoising framework, DDIM for faster deterministic sampling, and classifier-free guidance (CFG) for conditional control.
 The replication is done on MNIST and CIFAR-10, following professional research practices: planning and tracking work in the open, fixed seeds and pinned dependencies for reproducibility, experiment tracking, and an honest comparison against the published results.
-The conditional configurations use the dataset class label as the U-Net conditioning. During
+The conditional configurations use the dataset class label as the denoiser conditioning (U-Net or DiT). During
 training, `entrenamiento.p_uncond` randomly replaces a label with the reserved null class, so
 the same model learns both conditional and unconditional predictions. During sampling,
 `entrenamiento.guidance_scale` combines those predictions; `1` means conditional prediction only (no guidance) and `0` pure unconditional prediction. Unconditional models (`num_classes: 1`) ignore the scale.
@@ -81,7 +81,25 @@ For this checkpoint, IS increases across the tested guidance scales, while FID i
 Evaluating on the complete test set using the DDPM method takes much longer than doing it using DDIM. We have not included DDPM metrics yet due to the available compute budget.
 ## Architecture
 
-U-Net
+Two denoisers share the same DDPM, DDIM, CFG, EMA, evaluation, checkpoint and
+tracking pipeline:
+
+- **U-Net** (`src/models/unet.py`): residual blocks, timestep embedding and an
+  optional class embedding. It remains the default so existing configs and
+  checkpoints keep working unchanged.
+- **Diffusion Transformer (DiT)** (`src/models/dit.py`): patch embedding,
+  fixed 2-D sinusoidal positions, adaLN-Zero transformer blocks and a final
+  patch projection. `modelo.hidden_size`, `depth`, `num_heads`, `patch_size`,
+  `mlp_ratio` and `frequency_embedding_size` control its size. Class
+  conditioning uses the same reserved
+  null class as the U-Net, so classifier-free guidance works unchanged.
+
+`src/models/factory.py` selects the architecture from
+`modelo.arquitectura: dit` (or a `dit` token in `modelo.nombre`). Without that
+key the U-Net is built, which preserves compatibility with the previous
+configurations and checkpoints. `hidden_size` must be divisible by `num_heads`
+and by 4, and `patch_size` must divide the image side (28 for MNIST, 32 for
+CIFAR-10).
 
 
 ## Repository Map
@@ -137,6 +155,16 @@ python run.py --config configs/guided_cifar10.yaml
 
 # Class-conditional DDPM + classifier-free guidance (MNIST).
 python run.py --config configs/guided_mnist.yaml
+
+# Diffusion Transformer (DiT), unconditional and class-conditional + CFG.
+python run.py --config configs/dit_cifar10.yaml
+python run.py --config configs/guided_dit_cifar10.yaml
+python run.py --config configs/dit_mnist.yaml
+python run.py --config configs/guided_dit_mnist.yaml
+
+# Miniature end-to-end DiT pipeline (CPU smoke test).
+python run.py --config configs/smoke_dit.yaml
+
 # Improved LeNet CNN for MNIST dataset IS and FID metric evaluations.
 python run.py --config configs/mnist_evaluator.yaml
 
@@ -188,7 +216,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 pytest tests/ -q
 ```
 
-Tests cover diffusion/CFG maths (`tests/test_diffusion.py`), sampling labels and guidance scale (`tests/test_sampling_labels.py`), the data/training pipeline (`tests/test_ddpm_pipelines.py`), the web service (`tests/test_app_service.py`), `run.py --solo-evaluar` on the MNIST evaluator checkpoint (`tests/test_run_solo_evaluar.py`), reproducibility and the course checker.
+The evaluation changes add tests for balanced sampling labels and CFG-scale validation in `tests/test_sampling_labels.py`. The DiT tests in `tests/test_dit.py` cover CIFAR-10 and MNIST shapes, class conditioning, CFG prediction, DDIM sampling, architecture dispatch, app checkpoint loading and every shipped DiT config.
 
 ## Contributing
 ## Roadmap

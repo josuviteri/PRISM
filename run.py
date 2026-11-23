@@ -3,7 +3,7 @@
 Punto de entrada unico del proyecto.
 
     python run.py --smoke                        # pipeline entero en miniatura, < 5 min en CPU
-    python run.py --config configs/cifar10.yaml  # entrenamiento completo, < 20 min en T4
+    python run.py                                # entrenamiento completo, < 20 min en T4
     python run.py --config configs/cifar10.yaml --solo-evaluar
 
 Este fichero es deliberadamente corto: orquesta, no implementa. La logica vive

@@ -11,7 +11,7 @@ from typing import Any
 import torch
 from torch import Tensor, nn
 
-from src.models.unet import model as build_unet
+from src.models.factory import construir_modelo_desde_config
 from src.utils.diffusion_utils import GaussianDiffusion
 from src.utils.tracking import registrar, registrar_checkpoint
 
@@ -59,19 +59,13 @@ class ExponentialMovingAverage:
 
 
 def construir_modelo(cfg: dict[str, Any]) -> nn.Module:
-    """Builds the CIFAR U-Net from the model section of the configuration."""
-    model_cfg = cfg["modelo"]
-    is_mnist = cfg["datos"]["nombre"] == "mnist"
-    return build_unet(
-        in_ch=1 if is_mnist else 3,
-        out_ch=1 if is_mnist else 3,
-        ch=model_cfg["base_channels"],
-        ch_mult=tuple(model_cfg["channel_multipliers"]),
-        num_res_blocks=model_cfg["residual_blocks"],
-        attn_resolutions=tuple(model_cfg["attention_resolutions"]),
-        dropout=model_cfg["dropout"],
-        num_classes=model_cfg.get("num_classes", 1),
-    )
+    """Builds the U-Net or DiT selected by the configuration.
+
+    The default stays U-Net for backwards compatibility. Use
+    ``modelo.arquitectura: dit`` (or a ``dit`` token in ``modelo.nombre``) to
+    build a Diffusion Transformer with the same diffusion pipeline.
+    """
+    return construir_modelo_desde_config(cfg)
 
 
 def _device(cfg: dict[str, Any]) -> torch.device:
@@ -290,6 +284,41 @@ def evaluar(
     return {"val/loss": total_loss.item() / max(total_items, 1)}
 
 
+def _metricas_duras(cfg: dict[str, Any], checkpoint: Path, device: torch.device) -> dict[str, float]:
+    """Calcula FID e IS sobre el checkpoint recien guardado.
+
+    Restaura el estado del RNG al terminar: ``evaluar`` llama a ``torch.manual_seed`` y,
+    sin ``fork_rng``, alteraria la secuencia aleatoria del entrenamiento en curso.
+    """
+    from scripts import evaluate_diffusion_cifar10, evaluate_diffusion_mnist  # import perezoso
+
+    metric_cfg = cfg["metricas"]
+    common = {
+        "checkpoint": checkpoint,
+        "num_samples": int(metric_cfg.get("num_samples_intermedias", 2000)),
+        "batch_size": int(metric_cfg.get("batch_size", 256)),
+        "device_name": device.type,
+        "seed": int(cfg["experimento"]["seed"]),
+        "method": str(metric_cfg.get("metodo", "DDIM")).upper(),
+        "usar_etiquetas": bool(metric_cfg.get("usar_etiquetas", True)),
+        "guidance_scale": (
+            None if metric_cfg.get("guidance_scale") is None
+            else float(metric_cfg["guidance_scale"])
+        ),
+    }
+    if device.type == "cuda":
+        torch.cuda.empty_cache()  # libera la cache reservada por el entrenamiento
+    with torch.random.fork_rng(devices=[device] if device.type == "cuda" else []):
+        if cfg["datos"]["nombre"] == "mnist":
+            result = evaluate_diffusion_mnist.evaluar(
+                evaluator_checkpoint=Path(metric_cfg["evaluator_checkpoint"]), **common)
+        else:
+            result = evaluate_diffusion_cifar10.evaluar(**common)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+    return result
+
+
 def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], run=None) -> dict[str, float]:
     """Trains a DDPM and writes model + EMA weights (and resume state) to disk every epoch."""
     device = _device(cfg)
@@ -410,6 +439,11 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             _save_image_grid(samples, grid_path)
             _log_image(run, grid_path, global_step)
             print(f"saved {sample_count} EMA samples to {grid_path}")
+        metric_every = int(cfg.get("metricas", {}).get("cada_epocas", 0))
+        if metric_every and ((epoch + 1) % metric_every == 0 or finished):
+            hard = _metricas_duras(cfg, checkpoint, device)
+            registrar(run, {f"eval/{k}": v for k, v in hard.items()}, paso=global_step)
+            print(f"epoch {epoch + 1}: " + " ".join(f"eval/{k}={v:.4f}" for k, v in hard.items()))
         if finished:
             break
 

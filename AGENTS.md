@@ -2,11 +2,11 @@
 
 ## Qué es esto
 
-PRISM replica DDPM, DDIM y Classifier-Free Guidance (CFG) sobre MNIST y
-CIFAR-10 con un U-Net en PyTorch. Hay configuraciones incondicionales
-(`cifar10.yaml`, `mnist.yaml`) y guiadas por clase (`guided_cifar10.yaml`,
-`guided_mnist.yaml`), un clasificador LeNet que actúa de evaluador para FID/IS
-de MNIST (`mnist_evaluator.yaml`) y un aplicativo web (`src/app/`).
+PRISM replica DDPM y DDIM, y añade Classifier-Free Guidance (CFG) para MNIST y
+CIFAR-10. El pipeline PyTorch es común para ambos datasets y admite dos
+denoisers: el U-Net original y un Diffusion Transformer (DiT). El U-Net sigue
+siendo el modelo por defecto para no romper checkpoints antiguos; el DiT se
+selecciona por configuración.
 
 ## Restricciones del curso
 
@@ -35,8 +35,14 @@ pequeño, 10 pasos de difusión y como máximo 10 batches. Sirve para comprobar
 que carga datos, construye el U-Net, entrena, evalúa y escribe un checkpoint;
 no sirve para medir calidad generativa.
 
-Los hiperparámetros se cambian en `configs/`, no en el código. `dispositivo:
-auto` elige CUDA si está disponible y CPU en caso contrario.
+El entrenamiento completo usa `configs/cifar10.yaml`. Los hiperparámetros se
+cambian ahí, no en el código. `dispositivo: auto` elige CUDA si está
+disponible y CPU en caso contrario.
+
+Para el DiT hay configuraciones propias: `configs/dit_cifar10.yaml`,
+`configs/guided_dit_cifar10.yaml`, `configs/dit_mnist.yaml` y
+`configs/guided_dit_mnist.yaml`. Las variantes `guided_*` entrenan con clase
+nula y CFG. `configs/smoke_dit.yaml` ejecuta el pipeline DiT en miniatura.
 
 Los checkpoints se guardan en `checkpoints/<experimento.nombre>.pt`; la carpeta
 está ignorada por Git.
@@ -65,6 +71,14 @@ automáticamente por Torch CPU.
 - **La normalización usa estadísticas de entrenamiento, no del conjunto completo.**
   Lo contrario es una fuga de datos: no da error e infla la métrica.
 - El `data augmentation` se aplica a train, jamás a validación ni a test.
+- La construcción del modelo vive en `src/models/factory.py`: selecciona U-Net
+  o DiT según `modelo.arquitectura` (o un token `dit` en `modelo.nombre`).
+  `src/app/` importa esa factoría, nunca `src/training/`.
+- El DiT se configura con `hidden_size`, `depth`, `num_heads`, `patch_size`,
+  `mlp_ratio` y `frequency_embedding_size` (256 por defecto). `hidden_size`
+  debe ser divisible por `num_heads` y por 4
+  (posiciones sinusoidales); `patch_size` debe dividir el lado de la imagen
+  (28 en MNIST, 32 en CIFAR-10).
 - `src/app/` no importa nada de `src/training/`: el aplicativo solo carga un
   checkpoint y responde.
 - **`guidance_scale`:** `1.0` = solo predicción condicional (sin guidance) y
@@ -81,9 +95,26 @@ automáticamente por Torch CPU.
 
 ## Estado actual
 
-- Hecho: entrenamiento y evaluación DDPM/DDIM de CIFAR-10 y MNIST, CFG con
-  clase null y dropout de condición, evaluador LeNet para MNIST, métricas
-  FID/IS, aplicativo web, logging de métricas y Artifacts en W&B.
-- En curso: ampliar tests funcionales del pipeline y completar CI.
-- Pendiente: métricas con DDPM sobre el test completo (coste de cómputo);
-  renombrar los módulos `*_demo.py` (al renombrar, actualizar los imports).
+- Hecho: DDPM/DDIM y CFG para CIFAR-10 y MNIST con U-Net; entrenamiento,
+  evaluación y checkpoint EMA; logging de métricas y Artifacts de W&B.
+- Hecho: DiT con patchify, posiciones sinusoidales, bloques adaLN-Zero,
+  condicionamiento por clase, clase nula y CFG; configs para ambos datasets,
+  smoke propio y tests unitarios/integración.
+- En curso: redactar tests funcionales del pipeline y completar CI.
+- Pendiente: generar muestras durante evaluación en todas las configuraciones;
+  completar `src/app`; revisar los bugs conocidos de configs incondicionales y
+  del evaluador MNIST; al modificar los módulos `*_demo.py`, renombrarlos a la
+  hora de importarlos en otros ficheros.
+
+## Para añadir una arquitectura
+
+Añadir el módulo en `src/models/`, exponer un constructor con la misma interfaz
+`forward(x, t, y=None)` y el atributo `num_classes`, registrarlo en
+`src/models/factory.py` y crear una configuración con
+`modelo.arquitectura: <nombre>`. Antes de entrenar, añadir tests de forma para
+MNIST y CIFAR-10, condicionamiento, CFG y sampling.
+
+Para CFG, el modelo debe recibir `y` opcional, reservar una clase null y
+aplicar dropout de condición durante entrenamiento. En sampling hay que
+calcular predicción condicional e incondicional y combinarlas con la escala
+CFG configurada.

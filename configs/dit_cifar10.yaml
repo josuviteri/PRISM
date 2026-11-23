@@ -1,0 +1,62 @@
+# DiT incondicional sobre CIFAR-10. La difusion, EMA y checkpoints son los
+# mismos que en el U-Net; solo cambia el denoiser.
+
+experimento:
+  nombre: dit_cifar10_ddpm_v0.1
+  seed: 42
+
+datos:
+  nombre: cifar10
+  ruta: data/data/cifar-10
+  subset: null
+  batch_size: 128
+  num_workers: 4
+  pin_memory: true
+
+modelo:
+  nombre: dit_cifar10
+  arquitectura: dit
+  hidden_size: 256
+  depth: 6
+  num_heads: 4
+  patch_size: 2
+  mlp_ratio: 4.0
+  dropout: 0.1
+  num_classes: 1
+  diffusion_steps: 1000
+  ddim_timesteps: 50
+  beta_start: 0.0001
+  beta_end: 0.02
+  ema_decay: 0.9995
+  ema_warmup: true
+
+entrenamiento:
+  learning_rate: 0.0002
+  warmup_steps: 1000
+  epochs: 130
+  optimizador: adam
+  grad_clip: 1.0
+  horizontal_flip: true
+  compile: true
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
+  p_uncond: 0.0
+  guidance_scale: 1.0
+  reanudar: false
+  muestras_cada_epocas: 10
+  muestras_n: 64
+  directorio_muestras: samples
+
+metricas:
+  checkpoint: checkpoints/dit_cifar10_ddpm_v0.1.pt
+  num_samples: 10000
+  batch_size: 512
+  dispositivo: auto
+  metodo: DDIM
+  cada_epocas: 50                # FID/IS durante el entrenamiento (0 = desactivado)
+  num_samples_intermedias: 2000  # subconjunto estratificado; sesgado al alza frente al test completo
+
+wandb:
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: online

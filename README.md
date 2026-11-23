@@ -8,7 +8,7 @@ The replication is done on MNIST and CIFAR-10, following professional research p
 The conditional configurations use the dataset class label as the denoiser conditioning (U-Net or DiT). During
 training, `entrenamiento.p_uncond` randomly replaces a label with the reserved null class, so
 the same model learns both conditional and unconditional predictions. During sampling,
-`entrenamiento.guidance_scale` combines those predictions; a value of `1` disables guidance.
+`entrenamiento.guidance_scale` combines those predictions; `1` means conditional prediction only (no guidance) and `0` pure unconditional prediction. Unconditional models (`num_classes: 1`) ignore the scale.
 The developed models will be exposed in a web app that showcases the generation process: the initial full-noise state, the final denoised image, and the intermediate states in between. This makes it possible to see how the reverse-diffusion process gradually turns noise into structure, and to compare DDPM and DDIM sampling side by side.
 Because the training hardware and budget are private and limited, training time has been cut relative to the original papers. As a result, absolute quality metrics (FID, IS) are expected to fall short of the published figures. Every deviation from the papers is documented in the sections below, along with its likely consequences, so that results can be interpreted fairly rather than compared naively.
 
@@ -28,12 +28,12 @@ with a web UI for experimental guided generation on top.
 - **[DDIM Paper](https://arxiv.org/pdf/2010.02502)**
 - **[CFG Paper](https://arxiv.org/pdf/2207.12598)**
 - **[Reference of DDPM Implementation](https://github.com/hojonathanho/diffusion)**
-- **[Experiment Tracking: W&B](https://forge.coreweave.com/wandb/Viteritarrak/PRISM)**
+- **[Experiment Tracking: W&B](https://wandb.ai/Viteritarrak/PRISM)**
 - **Authors:** **[Josu Viteri](https://www.linkedin.com/in/josu-viteri/)** & **[Gotzon Viteri](https://www.linkedin.com/in/gotzonviteri/)**
 ## Decisions Papers Didn't Specify
 
-- **Evaluation labels:** class-conditional checkpoints are evaluated with balanced labels (cycling through the dataset classes) by default. `--sin-etiquetas` preserves the previous behaviour, sampling with the null class only.
-- **Classifier-free guidance:** CFG is only available for checkpoints trained with `entrenamiento.p_uncond > 0`. `--guidance-scale` overrides the scale used at evaluation; `w = 1` does not amplify guidance.
+- **Evaluation labels:** class-conditional checkpoints are evaluated with balanced labels (cycling through the dataset classes) by default. `--sin-etiquetas` samples without labels (`labels=None`), i.e. the legacy behaviour.
+- **Classifier-free guidance:** CFG is only available for checkpoints trained with `entrenamiento.p_uncond > 0`. `--guidance-scale` overrides the scale used at evaluation; `w = 1` is conditional-only (no guidance) and `w = 0` is purely unconditional.
 - **Unconditional checkpoints:** label selection does not affect unconditional models.
 
 ## Results
@@ -51,7 +51,7 @@ with a web UI for experimental guided generation on top.
 | guided_cifar_ddpm_v0.1 | 52.7k | DDIM, labels + CFG (`w = 2`) | Complete CIFAR-10 Test Set | **36.04** | **8.28** |
 | guided_cifar_ddpm_v0.1 | 52.7k | DDPM | Complete CIFAR-10 Test Set | NA | NA |
 
-Class-conditional checkpoints are now evaluated with class-balanced labels and CFG when the checkpoint was trained with `p_uncond > 0`. Earlier metric-script runs sampled using the null class only; use `--sin-etiquetas` to reproduce that behaviour. The unconditional CIFAR-10 checkpoint gives the same result with or without this flag (FID 41.2357, IS 6.9424).
+Class-conditional checkpoints are now evaluated with class-balanced labels and CFG when the checkpoint was trained with `p_uncond > 0`. Earlier metric-script runs sampled without labels; use `--sin-etiquetas` to reproduce that behaviour. The unconditional CIFAR-10 checkpoint gives the same result with or without this flag (FID 41.2357, IS 6.9424).
 
 ### Guidance-scale sweep (DDIM, 50 steps, complete test set)
 
@@ -59,7 +59,7 @@ Class-conditional checkpoints are now evaluated with class-balanced labels and C
 
 | Sampling | FID (lower is better) | IS (higher is better) |
 |---|---:|---:|
-| Null class only (previous behaviour) | 42.62 | 6.72 |
+| No labels (previous behaviour) | 42.62 | 6.72 |
 | Labels, `w = 1` | 38.63 | 7.33 |
 | Labels, `w = 2` | **36.04** | 8.28 |
 | Labels, `w = 3` | 38.99 | 8.50 |
@@ -71,7 +71,7 @@ For this checkpoint, IS increases across the tested guidance scales, while FID i
 
 | Sampling | FID | IS |
 |---|---:|---:|
-| Null class only (previous behaviour) | 34.34 | 2.16 |
+| No labels (previous behaviour) | 34.34 | 2.16 |
 | Labels, `w = 1` | 37.35 | 2.32 |
 | Labels, `w = 2` | 53.03 | 1.55 |
 | Labels, `w = 3` | 44.99 | 1.94 |
@@ -171,7 +171,13 @@ python run.py --config configs/mnist_evaluator.yaml
 # Start the web app through the project entry point.
 python run.py --serve
 
-# Calculate metrics and log FID/IS to W&B. Paths and sampling options live in the config.
+# Evaluate loss (soft metrics) from an existing checkpoint without training. Works for diffusion
+# checkpoints (EMA weights) and for the MNIST evaluator checkpoint (no EMA).
+python run.py --config configs/cifar10.yaml --solo-evaluar
+python run.py --config configs/mnist_evaluator.yaml --solo-evaluar
+
+# Calculate metrics and log FID/IS to W&B. Paths and sampling options live in the `metricas:` section of the config
+# (checkpoint, evaluator_checkpoint (MNIST), metodo, num_samples, batch_size, usar_etiquetas, guidance_scale).
 python run.py --solo-metricas --config configs/cifar10.yaml
 python run.py --solo-metricas --config configs/mnist.yaml
 # Generate images from gaussian noise using EMA weights.
@@ -192,7 +198,7 @@ python scripts/evaluate_diffusion_cifar10.py --checkpoint checkpoints/guided_cif
 python scripts/evaluate_diffusion_mnist.py --checkpoint checkpoints/guided_mnist_ddpm_v0.1.pt --evaluator-checkpoint checkpoints/mnist_evaluator_v0.1.pt --DDIM --batch-size 512 --guidance-scale 1
 ```
 
-Use `--guidance-scale W` to override the guidance scale, `--sin-etiquetas` to sample with the null class (legacy behaviour), and `--label C` in `inference_diffusion_uncond.py` to generate a specific class.
+Use `--guidance-scale W` to override the guidance scale, `--sin-etiquetas` to sample without labels (legacy behaviour), and `--label C` in `inference_diffusion_uncond.py` to generate a specific class.
 
 MNIST expects four uncompressed IDX files at `data/data/mnist`: `train-images.idx3-ubyte`, `train-labels.idx1-ubyte`, `t10k-images.idx3-ubyte` and `t10k-labels.idx1-ubyte`. Images are maintained in `28x28` with a single channel; normalization is calculated only with the train split.
 Evaluation downloads weights from Inception-v3 first time and requires `torchvision`,
@@ -200,7 +206,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 ### Reproducibility
 
 - Seed utility at `src/utils/seed_demo.py`; seed values are set in `configs/`.
-- Dependencies with exact versions at `requirements.txt`.
+- Experiment tracking: every run is logged to W&B (`proyecto`/`entidad`/`modo` in each config) with per-epoch `train/*` and `val/*` metrics, the final checkpoint is uploaded as a `model` Artifact named after `experimento.nombre`. Metric runs are named `<experimento.nombre>_eval`. `configs/smoke.yaml` uses `modo: offline`; tests use `disabled`.
 - Compute budget: **NVIDIA RTX 5070 12 GB**.
 - What the paper stated but was cut and its consequences: We decide to cut the training steps and did not evaluate using DDPM for now due to computing time constraints (it could be done in next releases).
 
@@ -210,7 +216,7 @@ included at `requirements.txt`. For a fast check, try to reduce the cost of eval
 pytest tests/ -q
 ```
 
-The evaluation changes add tests for balanced sampling labels and CFG-scale validation in `tests/test_sampling_labels.py`. The DiT tests in `tests/test_dit.py` cover CIFAR-10 and MNIST shapes, class conditioning, CFG prediction, DDIM sampling, architecture dispatch, app checkpoint loading and every shipped DiT config.
+Tests cover diffusion/CFG maths (`tests/test_diffusion.py`), balanced sampling labels and CFG-scale validation (`tests/test_sampling_labels.py`), the data/training pipeline (`tests/test_ddpm_pipelines.py`), the web service (`tests/test_app_service.py`), `run.py --solo-evaluar` on the MNIST evaluator checkpoint (`tests/test_run_solo_evaluar.py`), reproducibility and the course checker. The DiT tests in `tests/test_dit.py` cover CIFAR-10 and MNIST shapes, class conditioning, CFG prediction, DDIM sampling, architecture dispatch, app checkpoint loading and every shipped DiT config.
 
 ## Contributing
 ## Roadmap

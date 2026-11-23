@@ -1,17 +1,5 @@
 # Contexto del proyecto
 
-<!--
-Fichero de contexto para asistentes de IA (Claude Code, Copilot, Cursor…).
-Se explica en la sesión A1 del 9 de noviembre.
-
-Dos criterios para escribirlo:
-  1. Va lo que le dirías a alguien que se incorpora hoy al proyecto.
-  2. Si te encuentras repitiendo la misma corrección tres veces, esa
-     corrección va aquí.
-
-Dos páginas se leen enteras. Quince, no.
--->
-
 ## Qué es esto
 
 PRISM replica DDPM y DDIM, y añade Classifier-Free Guidance (CFG) para MNIST y
@@ -33,12 +21,13 @@ selecciona por configuración.
 
 ```bash
 source .venv/bin/activate
-python run.py --smoke                          # pipeline entero en miniatura
-python run.py                                  # entrenamiento completo (configs/cifar10.yaml)
-python run.py --config configs/cifar10.yaml --solo-evaluar
-python run.py --config configs/smoke_dit.yaml  # smoke del pipeline DiT
+python run.py --smoke                                   # pipeline entero en miniatura
+python run.py --config configs/cifar10.yaml             # entrenamiento completo (también mnist, guided_*, mnist_evaluator)
+python run.py --config configs/cifar10.yaml --solo-evaluar   # loss de validación desde el checkpoint, sin entrenar
+python run.py --config configs/cifar10.yaml --solo-metricas  # FID/IS desde el checkpoint (sección `metricas:`)
+python run.py --serve                                   # aplicativo web
 pytest tests/ -q
-python tools/tiiac_check.py .                  # cuando exista el checker
+python tools/tiiac_check_demo.py .                      # checker del curso
 ```
 
 `--smoke` selecciona `configs/smoke.yaml`: usa solo 64 imágenes, un modelo
@@ -55,17 +44,25 @@ Para el DiT hay configuraciones propias: `configs/dit_cifar10.yaml`,
 `configs/guided_dit_mnist.yaml`. Las variantes `guided_*` entrenan con clase
 nula y CFG. `configs/smoke_dit.yaml` ejecuta el pipeline DiT en miniatura.
 
-Los checkpoints se guardan en `checkpoints/<experimento.nombre>.pt`. El fichero
-contiene los pesos normales, los pesos EMA y la configuración usada. La carpeta
-está ignorada por Git. Cuando W&B está activo, el checkpoint final también se
-sube como Artifact de tipo `model`; las métricas se registran por época.
-Configura `wandb.entidad`, deja `wandb.modo: online` y ejecuta `wandb login`
-antes del entrenamiento. Para smoke/tests usa `wandb.modo: disabled`.
+Los checkpoints se guardan en `checkpoints/<experimento.nombre>.pt`; la carpeta
+está ignorada por Git.
 
-El entorno de desarrollo validado usa `torch==2.14.1+cu130` sobre una GPU
-NVIDIA RTX 5070. La instalación de esa versión puede requerir el índice de
-paquetes CUDA que corresponda a la máquina; no sustituirla automáticamente por
-Torch CPU.
+- Difusión: pesos normales (`model`), pesos EMA (`ema`) y configuración usada.
+  `--solo-evaluar` carga `ema`.
+- Evaluador MNIST (`format: mnist_evaluator_v1`): `model`, `config`,
+  `normalizacion` y métricas; **no tiene EMA**. `--solo-evaluar` carga `model`.
+
+W&B: las métricas se registran por época (`train/*`, `val/*`) y el checkpoint
+final se sube como Artifact de tipo `model` con el nombre del experimento. La
+run se llama `<experimento.nombre>` (y `<experimento.nombre>_eval` en
+`--solo-metricas`). Configura `wandb.entidad`, deja `wandb.modo: online` y
+ejecuta `wandb login` antes de entrenar. `configs/smoke.yaml` usa
+`wandb.modo: offline`; los tests usan `wandb.modo: disabled`.
+
+El entorno de desarrollo validado usa `torch==2.14.1` (build `+cu130`) sobre una
+GPU NVIDIA RTX 5070 (Python 3.11 en CI). La instalación de esa versión puede
+requerir el índice de paquetes CUDA que corresponda a la máquina; no sustituirla
+automáticamente por Torch CPU.
 
 ## Convenciones
 
@@ -84,12 +81,17 @@ Torch CPU.
   (28 en MNIST, 32 en CIFAR-10).
 - `src/app/` no importa nada de `src/training/`: el aplicativo solo carga un
   checkpoint y responde.
+- **`guidance_scale`:** `1.0` = solo predicción condicional (sin guidance) y
+  `0.0` = predicción incondicional pura. En modelos sin clases
+  (`num_classes: 1`) la escala se ignora.
 
 ## Lo que NO hay que tocar
 
-- `src/data/splits.py`: los splits están congelados desde el hito H3.
-- No reintroducir `torchvision` en el loader actual: CIFAR-10 se lee con
-  Pillow para evitar dependencia de backend.
+- Los splits de `src/data/loaders.py` (`construir_datasets`): están congelados
+  desde el hito H3.
+- CIFAR-10 y MNIST se leen con Pillow/IDX propio en `loaders.py`, sin
+  `torchvision.datasets`. `torchvision` solo se usa para los pesos de
+  Inception-v3 en la evaluación FID/IS de CIFAR-10.
 
 ## Estado actual
 

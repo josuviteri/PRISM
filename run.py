@@ -143,8 +143,14 @@ def main() -> int:
             print(f"error: no existe el checkpoint {checkpoint}", file=sys.stderr)
             return 2
         estado = torch.load(checkpoint, map_location="cpu", weights_only=True)
-        modelo.load_state_dict(estado["ema"])
-        modelo.to(diffusion_loop._device(cfg))
+        # El evaluador MNIST guarda solo "model"; los checkpoints de difusion guardan "ema".
+        clave = "model" if mnist_evaluator else "ema"
+        if clave not in estado:
+            print(f"error: el checkpoint {checkpoint} no contiene '{clave}'", file=sys.stderr)
+            return 2
+        modelo.load_state_dict(estado[clave])
+        loop = mnist_evaluator_loop if mnist_evaluator else diffusion_loop
+        modelo.to(loop._device(cfg))
     else:
         if mnist_evaluator:
             mnist_evaluator_loop.entrenar(modelo, train_loader, val_loader, cfg, run)

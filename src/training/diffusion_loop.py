@@ -432,7 +432,9 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
             samples = diffusion.sample(
                 ema.module, (sample_count, *image_shape), generator=generator,
                 labels=sample_labels,
-                guidance_scale=float(train_cfg.get("guidance_scale", 1.0)))
+                guidance_scale=(
+                    float(train_cfg.get("guidance_scale", 1.0))
+                    if sample_labels is not None else 1.0))
             grid_path = sample_dir / f"epoch_{epoch + 1:04d}.png"
             _save_image_grid(samples, grid_path)
             _log_image(run, grid_path, global_step)

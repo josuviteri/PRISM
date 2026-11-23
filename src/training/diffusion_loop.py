@@ -11,7 +11,7 @@ from typing import Any
 import torch
 from torch import Tensor, nn
 
-from src.models.unet import model as build_unet
+from src.models.factory import construir_modelo_desde_config
 from src.utils.diffusion_utils import GaussianDiffusion
 from src.utils.tracking import registrar, registrar_checkpoint
 
@@ -59,19 +59,13 @@ class ExponentialMovingAverage:
 
 
 def construir_modelo(cfg: dict[str, Any]) -> nn.Module:
-    """Builds the CIFAR U-Net from the model section of the configuration."""
-    model_cfg = cfg["modelo"]
-    is_mnist = cfg["datos"]["nombre"] == "mnist"
-    return build_unet(
-        in_ch=1 if is_mnist else 3,
-        out_ch=1 if is_mnist else 3,
-        ch=model_cfg["base_channels"],
-        ch_mult=tuple(model_cfg["channel_multipliers"]),
-        num_res_blocks=model_cfg["residual_blocks"],
-        attn_resolutions=tuple(model_cfg["attention_resolutions"]),
-        dropout=model_cfg["dropout"],
-        num_classes=model_cfg.get("num_classes", 1),
-    )
+    """Builds the U-Net or DiT selected by the configuration.
+
+    The default stays U-Net for backwards compatibility. Use
+    ``modelo.arquitectura: dit`` (or a ``dit`` token in ``modelo.nombre``) to
+    build a Diffusion Transformer with the same diffusion pipeline.
+    """
+    return construir_modelo_desde_config(cfg)
 
 
 def _device(cfg: dict[str, Any]) -> torch.device:

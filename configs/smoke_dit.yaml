@@ -1,0 +1,52 @@
+# Smoke test del pipeline DiT en miniatura. No mide calidad: comprueba que
+# datos, patchify, condicionamiento, CFG, entrenamiento, muestreo y checkpoint
+# funcionan de principio a fin en CPU.
+
+experimento:
+  nombre: smoke_dit
+  seed: 42
+
+datos:
+  nombre: cifar10
+  ruta: data/data/cifar-10
+  subset: 64
+  batch_size: 8
+  num_workers: 0
+  pin_memory: true
+
+modelo:
+  nombre: dit_smoke
+  arquitectura: dit
+  hidden_size: 32
+  depth: 2
+  num_heads: 4
+  patch_size: 4
+  mlp_ratio: 4.0
+  dropout: 0.0
+  num_classes: 10
+  diffusion_steps: 10
+  beta_start: 0.0001
+  beta_end: 0.02
+  ema_decay: 0.999
+
+entrenamiento:
+  learning_rate: 0.0002
+  warmup_steps: 0
+  epochs: 1
+  max_steps: 10
+  optimizador: adam
+  grad_clip: 1.0
+  horizontal_flip: true
+  compile: false
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
+  p_uncond: 0.1
+  guidance_scale: 3.0
+  muestras_cada_epocas: 1
+  muestras_n: 8
+  directorio_muestras: samples
+
+wandb:
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: offline

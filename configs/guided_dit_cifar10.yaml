@@ -1,0 +1,59 @@
+# DiT condicional sobre CIFAR-10 con clase nula y CFG desde el entrenamiento.
+
+experimento:
+  nombre: guided_dit_cifar10_ddpm_v0.1
+  seed: 42
+
+datos:
+  nombre: cifar10
+  ruta: data/data/cifar-10
+  subset: null
+  batch_size: 128
+  num_workers: 4
+  pin_memory: true
+
+modelo:
+  nombre: guided_dit_cifar10
+  arquitectura: dit
+  hidden_size: 256
+  depth: 6
+  num_heads: 4
+  patch_size: 2
+  mlp_ratio: 4.0
+  dropout: 0.1
+  num_classes: 10
+  diffusion_steps: 1000
+  ddim_timesteps: 50
+  beta_start: 0.0001
+  beta_end: 0.02
+  ema_decay: 0.9995
+  ema_warmup: true
+
+entrenamiento:
+  learning_rate: 0.0002
+  warmup_steps: 1000
+  epochs: 150
+  optimizador: adam
+  grad_clip: 1.0
+  horizontal_flip: true
+  compile: true
+  dispositivo: auto
+  directorio_checkpoints: checkpoints
+  p_uncond: 0.1
+  guidance_scale: 3.0
+  reanudar: false
+  muestras_cada_epocas: 10
+  muestras_n: 64
+  directorio_muestras: samples
+
+metricas:
+  checkpoint: checkpoints/guided_dit_cifar10_ddpm_v0.1.pt
+  num_samples: 10000
+  batch_size: 512
+  dispositivo: auto
+  metodo: DDIM
+
+wandb:
+  proyecto: PRISM
+  entidad: Viteritarrak
+  modo: online

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import math
 import time
 from copy import deepcopy
@@ -335,7 +336,16 @@ def entrenar(model: nn.Module, train_loader, val_loader, cfg: dict[str, Any], ru
     model.to(device)
     train_model = model
     if train_cfg.get("compile", False) and device.type == "cuda":
-        train_model = torch.compile(model)
+        # torch.compile's Inductor backend needs Triton. Triton has no official
+        # Windows wheels, so the same config must still work there without
+        # forcing every user to install an unofficial build.
+        if importlib.util.find_spec("triton") is None:
+            print(
+                "warning: torch.compile skipped because Triton is not installed "
+                "(common on Windows); training will run eagerly"
+            )
+        else:
+            train_model = torch.compile(model)
     diffusion = GaussianDiffusion(
         model_cfg["diffusion_steps"], model_cfg["beta_start"], model_cfg["beta_end"], device)
     optimizer_name = train_cfg["optimizador"].lower()
